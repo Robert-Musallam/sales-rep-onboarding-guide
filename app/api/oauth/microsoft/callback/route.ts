@@ -64,6 +64,9 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${process.env.APP_BASE_URL ?? url.origin}/settings?connected=microsoft`);
   } catch (e) {
     if (e instanceof ActionError) return NextResponse.json({ error: e.message }, { status: e.status });
-    return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
+    // This route is admin-only (requireUser above) — surface the real message,
+    // config mistakes here are otherwise undiagnosable.
+    const msg = e instanceof Error ? e.message : "Unexpected error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
