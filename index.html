@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Rep Onboarding — Manager's Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F1F2ED;
+    --paper:#FFFFFF;
+    --line:#DBDECE;
+    --line-soft:#E9EAE0;
+    --ink:#20251F;
+    --ink-soft:#565C50;
+    --moss:#3B4736;
+    --moss-deep:#232B20;
+
+    --a:#2F5C7A;      /* Gusto */
+    --a-tint:#E7EEF2;
+    --a-line:#B9CCD8;
+
+    --b:#A24A2C;       /* Business License */
+    --b-tint:#F3E5DE;
+    --b-line:#DDB6A5;
+
+    --c:#96721B;       /* Welcome message */
+    --c-tint:#F4EDD9;
+    --c-line:#DEC988;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Source Sans 3', sans-serif;
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{
+    font-family:'Barlow Semi Condensed', sans-serif;
+    color:var(--moss-deep);
+    line-height:1.15;
+    letter-spacing:.2px;
+    margin:0;
+  }
+  a{color:var(--a);}
+  code, .mono{font-family:'IBM Plex Mono', monospace;}
+
+  .shell{display:flex; max-width:1180px; margin:0 auto;}
+  nav.toc{
+    width:220px; flex:none;
+    position:sticky; top:0; align-self:flex-start;
+    height:100vh; overflow-y:auto;
+    padding:32px 18px 32px 28px;
+    border-right:1px solid var(--line);
+  }
+  nav.toc .toc-title{
+    font-family:'Barlow Semi Condensed';
+    font-size:12px; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--ink-soft); margin-bottom:14px;
+  }
+  nav.toc ol{list-style:none; margin:0; padding:0; counter-reset:tocnum;}
+  nav.toc li{counter-increment:tocnum; margin-bottom:2px;}
+  nav.toc a{
+    display:block; padding:6px 8px; border-radius:5px;
+    color:var(--ink); text-decoration:none; font-size:13.5px;
+    border-left:2px solid transparent;
+  }
+  nav.toc a::before{
+    content: counter(tocnum) "  ";
+    color:var(--ink-soft); font-family:'IBM Plex Mono'; font-size:11px;
+  }
+  nav.toc a:hover{background:var(--line-soft); border-left-color:var(--moss);}
+
+  main{flex:1; min-width:0; padding:0 0 70px 0;}
+
+  header.hero{
+    padding:52px 56px 36px 56px;
+    border-bottom:1px solid var(--line);
+    background: radial-gradient(1100px 260px at 85% -10%, rgba(59,71,54,.06), transparent 60%);
+  }
+  header.hero .brandrow{display:flex; align-items:center; gap:16px; margin-bottom:26px;}
+  header.hero img.logo{height:44px; width:auto; display:block;}
+  header.hero .brandrow .tag{
+    font-family:'IBM Plex Mono'; font-size:11.5px; color:var(--ink-soft);
+    border:1px solid var(--line); border-radius:20px; padding:4px 12px;
+  }
+  header.hero h1{font-size:36px; font-weight:800; max-width:720px;}
+  header.hero .subtitle{font-size:17px; color:var(--ink-soft); margin-top:10px; max-width:640px;}
+
+  section{padding:40px 56px; border-bottom:1px solid var(--line);}
+  section:last-of-type{border-bottom:none;}
+  .kicker{
+    font-family:'IBM Plex Mono'; font-size:11.5px; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--ink-soft); margin-bottom:8px;
+  }
+  h2.sectitle{font-size:26px; font-weight:700; margin-bottom:6px;}
+  .secdesc{color:var(--ink-soft); max-width:720px; margin-bottom:22px; font-size:15.5px;}
+
+  table{width:100%; border-collapse:collapse; font-size:14.5px;}
+  th{
+    text-align:left; font-family:'Barlow Semi Condensed'; font-weight:600;
+    font-size:13px; letter-spacing:.3px; text-transform:uppercase;
+    color:var(--ink-soft); border-bottom:1px solid var(--line); padding:10px 12px;
+    background:#FAFAF6;
+  }
+  td{padding:11px 12px; border-bottom:1px solid var(--line-soft); vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .tblwrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px;}
+  .tblwrap table{margin:0;}
+
+  .statrow{display:flex; gap:16px; margin:22px 0 0; flex-wrap:wrap;}
+  .stat{flex:1; min-width:140px; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:14px 18px;}
+  .stat .n{font-family:'Barlow Semi Condensed'; font-size:28px; font-weight:800; color:var(--moss-deep);}
+  .stat .l{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+
+  .rolelist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px;}
+  .rolelist li{
+    display:flex; gap:14px; align-items:flex-start; background:var(--paper);
+    border:1px solid var(--line); border-radius:10px; padding:14px 18px;
+  }
+  .rolelist .num{
+    font-family:'Barlow Semi Condensed'; font-weight:800; font-size:14px; color:#fff;
+    background:var(--moss); border-radius:50%; width:26px; height:26px; flex:none;
+    display:flex; align-items:center; justify-content:center; margin-top:1px;
+  }
+  .rolelist .txt b{color:var(--moss-deep);}
+  .note{
+    margin-top:16px; font-size:13.5px; color:var(--ink-soft);
+    border-left:3px solid var(--moss); padding:4px 0 4px 14px;
+  }
+
+  .legend{display:flex; gap:14px; margin:18px 0 6px; flex-wrap:wrap;}
+  .legend .item{display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--ink-soft);}
+  .legend .sw{width:13px; height:13px; border-radius:3px; display:inline-block;}
+  .diagram-wrap{background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:18px; overflow-x:auto;}
+
+  .track-block{border-radius:12px; border:1px solid var(--line); margin-bottom:14px; overflow:hidden;}
+  .track-block .track-head{padding:12px 20px; font-family:'Barlow Semi Condensed'; font-weight:700; font-size:16px; color:#fff;}
+  .track-block .track-body{padding:14px 20px 16px; background:var(--paper); font-size:14.5px;}
+  .track-a .track-head{background:var(--a);}
+  .track-b .track-head{background:var(--b);}
+  .track-c .track-head{background:var(--c);}
+
+  .foot{padding:26px 56px; color:var(--ink-soft); font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="toc">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#role">Your role</a></li>
+    <li><a href="#diagrama">How it flows</a></li>
+    <li><a href="#formularios">The 3 forms</a></li>
+    <li><a href="#checklist">The checklist boxes</a></li>
+    <li><a href="#regiones">Regional contacts</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <header class="hero">
+    <div class="brandrow">
+      <img class="logo" src="https://rocknblocklandscape.com/wp-content/uploads/Rock-N-Block-Updated-Logo.jpg.webp" alt="Rock N Block">
+      <span class="tag">Manager's guide</span>
+    </div>
+    <h1>Onboarding a new sales rep — what's on you</h1>
+    <p class="subtitle">Once you register a new hire, most of the setup takes care of itself. This is the short version of what happens, and the handful of things only you can do.</p>
+  </header>
+
+  <!-- ============ YOUR ROLE ============ -->
+  <section id="role">
+    <div class="kicker">01</div>
+    <h2 class="sectitle">Your role, start to finish</h2>
+    <p class="secdesc">You're the owner of this process for your new hire. Everything below is on you — the system handles the rest automatically once you do your part.</p>
+
+    <ul class="rolelist">
+      <li>
+        <span class="num">1</span>
+        <span class="txt"><b>Submit the Onboarding Registration Form</b> for your new hire, picking your own name from the manager dropdown.</span>
+      </li>
+      <li>
+        <span class="num">2</span>
+        <span class="txt"><b>Make sure your new hire completes the Basic Information form.</b> Nothing else moves forward until they do.</span>
+      </li>
+      <li>
+        <span class="num">3</span>
+        <span class="txt"><b>Check off each box on the Onboarding Checklist</b> — Gusto, Business License, Welcome message — the moment it's actually true. Checking a box is what kicks off everything tied to it.</span>
+      </li>
+      <li>
+        <span class="num">4</span>
+        <span class="txt"><b>That's it.</b> Account creation, team chats, and the company-wide welcome all happen on their own once you check the box.</span>
+      </li>
+    </ul>
+
+    <p class="note">There's no deadline on any of this — one step simply waits for the one before it. Nothing happens until you or your new hire complete the step that triggers it.</p>
+
+    <div class="statrow">
+      <div class="stat"><div class="n">3</div><div class="l">Forms, in order</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">Boxes you check off</div></div>
+      <div class="stat"><div class="n">5</div><div class="l">Regional offices</div></div>
+    </div>
+  </section>
+
+  <!-- ============ DIAGRAM ============ -->
+  <section id="diagrama">
+    <div class="kicker">02</div>
+    <h2 class="sectitle">How it flows</h2>
+    <p class="secdesc">Three forms, in order. The third one is the checklist — each box you check fires its own outcome, independently of the other two.</p>
+
+    <div class="legend">
+      <span class="item"><span class="sw" style="background:var(--moss);"></span> Automatic</span>
+      <span class="item"><span class="sw" style="background:var(--a);"></span> Gusto</span>
+      <span class="item"><span class="sw" style="background:var(--b);"></span> Business License</span>
+      <span class="item"><span class="sw" style="background:var(--c);"></span> Welcome message</span>
+    </div>
+
+    <div class="diagram-wrap">
+    <svg viewBox="0 0 1180 620" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; font-family:'Source Sans 3',sans-serif;">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#8A9080"/>
+        </marker>
+      </defs>
+
+      <rect x="20" y="40" width="270" height="70" rx="10" fill="#FFFFFF" stroke="#3B4736" stroke-width="1.4"/>
+      <text x="45" y="68" font-weight="700" font-size="14.5" fill="#232B20">Registration Form</text>
+      <text x="45" y="87" font-size="12" fill="#565C50">You fill this out</text>
+      <text x="45" y="102" font-size="10.5" font-family="'IBM Plex Mono'" fill="#8A9080">name · role · office · start date</text>
+
+      <line x1="290" y1="75" x2="350" y2="75" stroke="#8A9080" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+      <rect x="350" y="40" width="290" height="70" rx="10" fill="#FFFFFF" stroke="#3B4736" stroke-width="1.4"/>
+      <text x="375" y="68" font-weight="700" font-size="14.5" fill="#232B20">Basic Information</text>
+      <text x="375" y="87" font-size="12" fill="#565C50">Your new hire fills this out</text>
+      <text x="375" y="102" font-size="10.5" font-family="'IBM Plex Mono'" fill="#8A9080">address · DOB · shirt size · phone type</text>
+
+      <line x1="640" y1="75" x2="700" y2="75" stroke="#8A9080" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+      <rect x="700" y="40" width="280" height="70" rx="10" fill="#FFFFFF" stroke="#3B4736" stroke-width="1.4"/>
+      <text x="725" y="68" font-weight="700" font-size="14.5" fill="#232B20">Onboarding Checklist</text>
+      <text x="725" y="87" font-size="12" fill="#565C50">You check these off</text>
+      <text x="725" y="102" font-size="10.5" font-family="'IBM Plex Mono'" fill="#8A9080">Gusto · License · Welcome</text>
+
+      <line x1="840" y1="110" x2="840" y2="128" stroke="#8A9080" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+      <!-- gate -->
+      <polygon points="840,128 900,160 840,192 780,160" fill="#3B4736"/>
+      <text x="840" y="156" text-anchor="middle" font-size="11" fill="#fff" font-weight="600">which box</text>
+      <text x="840" y="169" text-anchor="middle" font-size="11" fill="#fff" font-weight="600">got checked?</text>
+
+      <!-- fan to 3 lanes -->
+      <line x1="820" y1="182" x2="190" y2="248" stroke="#2F5C7A" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <line x1="840" y1="192" x2="590" y2="248" stroke="#A24A2C" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <line x1="860" y1="182" x2="990" y2="248" stroke="#96721B" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+      <!-- LANE A: Gusto -->
+      <rect x="40" y="248" width="300" height="200" rx="12" fill="#E7EEF2" stroke="#B9CCD8" stroke-width="1.2"/>
+      <rect x="40" y="248" width="300" height="32" rx="12" fill="#2F5C7A"/>
+      <rect x="40" y="264" width="300" height="16" fill="#2F5C7A"/>
+      <text x="190" y="270" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">GUSTO → checked</text>
+
+      <g font-size="12" fill="#1E3140">
+        <rect x="60" y="296" width="260" height="60" rx="7" fill="#fff" stroke="#B9CCD8"/>
+        <text x="75" y="318" font-weight="600" font-size="12">Creates their company account</text>
+        <text x="75" y="335" font-size="10.5" fill="#4C6478">email + Teams login, ready to use</text>
+
+        <rect x="60" y="366" width="260" height="66" rx="7" fill="#fff" stroke="#B9CCD8" stroke-dasharray="3 3"/>
+        <text x="75" y="390" font-weight="600" font-size="12">Marks Gusto as done</text>
+        <text x="75" y="407" font-size="10.5" fill="#4C6478">won't repeat if you check it twice</text>
+      </g>
+
+      <!-- LANE B: Business License -->
+      <rect x="360" y="248" width="460" height="330" rx="12" fill="#F3E5DE" stroke="#DDB6A5" stroke-width="1.2"/>
+      <rect x="360" y="248" width="460" height="32" fill="#A24A2C"/>
+      <text x="590" y="270" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">BUSINESS LICENSE → checked</text>
+
+      <g font-size="12" fill="#4A2213">
+        <rect x="380" y="296" width="420" height="58" rx="7" fill="#fff" stroke="#DDB6A5"/>
+        <text x="395" y="318" font-weight="600" font-size="12">1:1 welcome chat with you</text>
+        <text x="395" y="335" font-size="10.5" fill="#8A4A34">how sales reporting works + app reminder</text>
+
+        <rect x="380" y="364" width="420" height="58" rx="7" fill="#fff" stroke="#DDB6A5"/>
+        <text x="395" y="386" font-weight="600" font-size="12">Creates their region's "Phone Room" group</text>
+        <text x="395" y="403" font-size="10.5" fill="#8A4A34">and loops in the regional supervisor</text>
+
+        <rect x="380" y="432" width="420" height="52" rx="7" fill="#fff" stroke="#DDB6A5"/>
+        <text x="395" y="454" font-weight="600" font-size="12">Adds them to the existing regional sales team chat</text>
+        <text x="395" y="470" font-size="10.5" fill="#8A4A34">Tampa · Las Vegas/Utah · San Diego/AZ/OC · Santa Clara</text>
+
+        <rect x="380" y="494" width="420" height="66" rx="7" fill="#fff" stroke="#DDB6A5" stroke-dasharray="3 3"/>
+        <text x="395" y="518" font-weight="600" font-size="12">Marks Business License as done</text>
+        <text x="395" y="535" font-size="10.5" fill="#8A4A34">won't repeat if you check it twice</text>
+      </g>
+
+      <!-- LANE C: Welcome -->
+      <rect x="840" y="248" width="300" height="200" rx="12" fill="#F4EDD9" stroke="#DEC988" stroke-width="1.2"/>
+      <rect x="840" y="248" width="300" height="32" fill="#96721B"/>
+      <text x="990" y="270" text-anchor="middle" font-size="13" fill="#fff" font-weight="700">WELCOME → checked</text>
+
+      <g font-size="12" fill="#4A3B0F">
+        <rect x="860" y="296" width="260" height="66" rx="7" fill="#fff" stroke="#DEC988"/>
+        <text x="875" y="318" font-weight="600" font-size="12">Public shout-out + welcome email</text>
+        <text x="875" y="335" font-size="10.5" fill="#7A5E14">company channel post, plus their</text>
+        <text x="875" y="349" font-size="10.5" fill="#7A5E14">first-week setup email</text>
+
+        <rect x="860" y="374" width="260" height="56" rx="7" fill="#fff" stroke="#DEC988" stroke-dasharray="3 3"/>
+        <text x="875" y="398" font-weight="600" font-size="12">Marks Welcome as sent</text>
+        <text x="875" y="415" font-size="10.5" fill="#7A5E14">won't repeat if you check it twice</text>
+      </g>
+    </svg>
+    </div>
+  </section>
+
+  <!-- ============ FORMS ============ -->
+  <section id="formularios">
+    <div class="kicker">03</div>
+    <h2 class="sectitle">The 3 forms</h2>
+    <div class="tblwrap">
+    <table>
+      <tr><th>Form</th><th>Who fills it out</th><th>What it's for</th></tr>
+      <tr>
+        <td><b>Onboarding Registration Form</b></td>
+        <td>You (pick your name from the dropdown)</td>
+        <td>Gets your new hire into the system — their name, role, office, and start date</td>
+      </tr>
+      <tr>
+        <td><b>Onboarding Basic Information</b></td>
+        <td>Your new hire</td>
+        <td>Their address, birthday, shirt size, and phone type — needed before their account can be set up</td>
+      </tr>
+      <tr>
+        <td><b>Onboarding Checklist</b></td>
+        <td>You</td>
+        <td>Check off Gusto, Business License, and Welcome message as each one becomes true</td>
+      </tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ CHECKLIST ============ -->
+  <section id="checklist">
+    <div class="kicker">04</div>
+    <h2 class="sectitle">The checklist boxes — what each one does</h2>
+    <p class="secdesc">These three don't depend on each other — check them in whatever order makes sense, whenever each one is actually true.</p>
+
+    <div class="track-block track-a">
+      <div class="track-head">Gusto</div>
+      <div class="track-body">Creates their company account — email and Teams login, ready for them to use.</div>
+    </div>
+
+    <div class="track-block track-b">
+      <div class="track-head">Business License</div>
+      <div class="track-body">Gets them plugged into the team: a 1:1 welcome chat with you, their region's "Phone Room" group with their supervisor, and their region's existing sales team chat — plus a reminder to have Teams and WhatsApp set up on their phone.</div>
+    </div>
+
+    <div class="track-block track-c">
+      <div class="track-head">Welcome message</div>
+      <div class="track-body">Posts the public welcome announcement for the whole company, and sends them the official welcome email with their first-week setup steps.</div>
+    </div>
+  </section>
+
+  <!-- ============ REGIONS ============ -->
+  <section id="regiones">
+    <div class="kicker">05</div>
+    <h2 class="sectitle">Regional contacts</h2>
+    <p class="secdesc">Whoever gets looped into the "Phone Room" automatically when you check Business License, based on the rep's office.</p>
+    <div class="tblwrap">
+    <table>
+      <tr><th>Office / region</th><th>Added to Phone Room</th></tr>
+      <tr><td>Arizona · San Diego · OC/IE</td><td>Mike Reiser + Greg Zamora</td></tr>
+      <tr><td>OC/IE</td><td>Greg Zamora</td></tr>
+      <tr><td>Arizona</td><td>Jason Talmage</td></tr>
+      <tr><td>Tampa</td><td>Branden Haire</td></tr>
+      <tr><td>Las Vegas / St. George</td><td>Chris Faronea</td></tr>
+      <tr><td>Santa Clara</td><td>Robert Musallam</td></tr>
+    </table>
+    </div>
+    <p class="note">This list is set by hand today — if someone changes roles, it's updated manually rather than on its own.</p>
+  </section>
+
+  <div class="foot">Rock N Block — Sales Rep Onboarding, Manager's Guide.</div>
+
+</main>
+</div>
+</body>
+</html>
