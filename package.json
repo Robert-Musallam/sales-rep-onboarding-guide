@@ -1,0 +1,40 @@
+{
+  "name": "rnb-onboarding",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "worker": "tsx worker/index.ts",
+    "worker:once": "tsx worker/index.ts --once",
+    "verify:graph": "tsx scripts/verify_graph.ts",
+    "verify:dialpad": "tsx scripts/verify_dialpad.ts",
+    "verify:hcp": "tsx scripts/verify_hcp.ts",
+    "verify:jotform": "tsx scripts/verify_jotform.ts",
+    "test:rep": "tsx scripts/create_test_rep.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.0",
+    "@tanstack/react-table": "^8.21.3",
+    "clsx": "^2.1.1",
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20.19.43",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "tailwindcss": "^4",
+    "tsx": "^4.22.5",
+    "typescript": "^5"
+  }
+}

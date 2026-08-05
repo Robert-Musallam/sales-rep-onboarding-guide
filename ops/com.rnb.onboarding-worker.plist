@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.rnb.onboarding-worker</string>
+
+  <!-- Single outbox pass every 60s. Secrets live in REPO/.env.local (loaded by
+       worker/env.ts); only the operating-mode gates are set here so a machine
+       migration is: copy repo + .env.local, run ops/install_worker.sh. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd __REPO__ && npx tsx worker/index.ts >> worker/logs/worker.log 2>&1</string>
+  </array>
+
+  <key>StartInterval</key>
+  <integer>60</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <!-- Flip to send_enabled at cutover (SETUP.md §go-live). -->
+    <key>RNB_AUTOMATION_MODE</key>
+    <string>dry_run</string>
+  </dict>
+
+  <key>StandardErrorPath</key>
+  <string>__REPO__/worker/logs/launchd.err.log</string>
+</dict>
+</plist>

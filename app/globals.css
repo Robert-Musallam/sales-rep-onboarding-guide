@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+/* ── Rock N Block brand palette ─────────────────────────────────────────
+   Light ops theme; primary steel-blue #2a5885 (from RNB welcome-email brand
+   color). Variable names are kept identical to the GCVPM OS primitives so the
+   shared components (Shell/Grid/Board/…) work unmodified — "navy" = RNB blue. */
+@theme {
+  --color-bg: #eef2f6;
+  --color-card: #ffffff;
+  --color-ink: #16242f;
+  --color-muted: #64788a;
+  --color-line: #e2e8ef;
+
+  --color-navy: #2a5885;
+  --color-navy-700: #204364;
+  --color-navy-300: #567ba3;
+
+  --color-teal: #1f7a8c;
+  --color-green: #2e9e5b;
+  --color-red: #d1495b;
+  --color-amber: #e0992b;
+  --color-orange: #e2703a;
+  --color-slate: #64788a;
+
+  /* pastel accents */
+  --color-pk: #fac7df;
+  --color-bl: #aee0ec;
+  --color-mint: #b6ecd6;
+  --color-peach: #ffd7a6;
+  --color-lav: #cdbef5;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root {
+  --shadow: 0 1px 2px rgba(16, 40, 60, 0.06), 0 4px 16px rgba(16, 40, 60, 0.06);
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reusable card / control primitives */
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--color-line);
+  background: #fff;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: #f6f9fb; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary {
+  background: var(--color-navy);
+  border-color: var(--color-navy);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) { background: var(--color-navy-700); }
+.btn-sm { padding: 4px 9px; font-size: 12px; border-radius: 7px; }
+
+.input,
+.select {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 11px;
+  border: 1px solid var(--color-line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--color-ink);
+  outline: none;
+}
+.input:focus,
+.select:focus {
+  border-color: var(--color-navy-300);
+  box-shadow: 0 0 0 3px rgba(35, 49, 82, 0.08);
+}
+
+.tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* thin scrollbars for dense data areas */
+.thin-scroll::-webkit-scrollbar { height: 9px; width: 9px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: #c9d4de; border-radius: 999px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
