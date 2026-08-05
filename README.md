@@ -5,6 +5,10 @@ runs the automations natively (Dialpad SMS, Microsoft user/Teams/email, Housecal
 Pro, Jotform), and gates readiness behind a training curriculum + test. Replaces
 the Jotform×3 + Make.com + Google Sheet chain.
 
+> 📖 The original static **Manager's Guide** this repo started as now lives at
+> [`public/guide/index.html`](public/guide/index.html) and is served by the app
+> at `/guide/index.html` (no login required).
+
 ## Architecture (inherited from GCVPM OS / gcv-renewals)
 
 - **Next.js 16 App Router** on Vercel · Tailwind v4 · hand-rolled primitives
@@ -16,7 +20,8 @@ the Jotform×3 + Make.com + Google Sheet chain.
   60s single-pass) executes them via connectors behind the gate stack
   (dry-run default → kill switch → pilot allowlists)
 - **Connectors** (`worker/connectors/`): Graph (app-only + delegated for chat
-  sends), Dialpad, HCP (key per territory), Jotform
+  sends), Dialpad, HCP (keys resolved from `public.office_configs` per
+  territory), Jotform
 - **Rep hub** (`/my/<token>`): tokenized page per rep — progress, curriculum,
   readiness test. No login needed.
 - **Edge function** `jotform-webhook`: ingests the rep-info form 24/7.

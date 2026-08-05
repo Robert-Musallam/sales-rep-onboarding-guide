@@ -42,6 +42,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
     path.startsWith("/my") || // rep hub — token-authenticated, no Supabase session
+    path.startsWith("/guide") || // static manager's guide (public/guide/)
     path.startsWith("/api") || // API routes enforce auth themselves (return 401, not redirect)
     path.startsWith("/_next") ||
     path === "/favicon.ico";
