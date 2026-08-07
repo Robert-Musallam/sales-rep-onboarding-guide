@@ -1,29 +1,42 @@
 import { ENV } from "../env";
 
 /**
- * Jotform connector. Used for ONE thing in the new system: creating a
- * pre-filled submission in the rep-info form so the rep gets an edit link by
- * SMS (exactly what the Make scenario did). The webhook INGESTS submissions via
- * the Supabase edge function, not this module.
+ * Jotform connector. Creates/updates submissions via the API:
+ *  - rep-info form prefill (fields 41=phone, 42=first, 43=last — same fields
+ *    the Make scenario used) so the rep gets an edit link by SMS
+ *  - manager-form mirror so form 261604930668664 stays the registration record
+ * Ingestion happens in the Supabase edge function, not here.
  */
-export async function createPrefilledSubmission(
-  formId: string,
-  fields: Record<string, string>,
-): Promise<{ submissionId: string; editLink: string }> {
+async function post(path: string, fields: Record<string, string>): Promise<Record<string, unknown>> {
   const body = new URLSearchParams();
-  for (const [qid, value] of Object.entries(fields)) {
-    body.set(`submission[${qid}]`, value);
-  }
-  const res = await fetch(`${ENV.jotformBaseUrl()}/form/${formId}/submissions?apiKey=${ENV.jotformApiKey()}`, {
+  for (const [k, v] of Object.entries(fields)) body.set(`submission[${k}]`, v);
+  const res = await fetch(`${ENV.jotformBaseUrl()}${path}?apiKey=${ENV.jotformApiKey()}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
-  if (!res.ok) throw new Error(`jotform createSubmission: ${res.status} ${await res.text()}`);
-  const j = (await res.json()) as { content?: { submissionID?: string } };
-  const submissionId = j.content?.submissionID;
+  if (!res.ok) throw new Error(`jotform ${path}: ${res.status} ${await res.text()}`);
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function createSubmission(
+  formId: string,
+  fields: Record<string, string>,
+): Promise<{ submissionId: string; editLink: string }> {
+  const j = await post(`/form/${formId}/submissions`, fields);
+  const submissionId = (j.content as { submissionID?: string })?.submissionID;
   if (!submissionId) throw new Error(`jotform createSubmission: no submissionID in ${JSON.stringify(j)}`);
   return { submissionId, editLink: `https://www.jotform.com/edit/${submissionId}` };
+}
+
+export async function updateSubmission(submissionId: string, fields: Record<string, string>): Promise<void> {
+  await post(`/submission/${submissionId}`, fields);
+}
+
+/** "(408) 410-5938" from an E.164/raw phone — matches what the forms display. */
+export function prettyPhone(raw: string | null | undefined): string {
+  const d = (raw ?? "").replace(/\D/g, "").slice(-10);
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : (raw ?? "");
 }
 
 /** Credential check for scripts/verify_jotform.ts. */

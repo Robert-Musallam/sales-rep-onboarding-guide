@@ -28,9 +28,10 @@
   <dict>
     <key>PATH</key>
     <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
-    <!-- Flip to send_enabled at cutover (SETUP.md §go-live). -->
+    <!-- PILOT phase: sends enabled but PILOT_SEND_ONLY (.env.local) restricts
+         recipients to the allowlist. Remove PILOT_SEND_ONLY at cutover. -->
     <key>RNB_AUTOMATION_MODE</key>
-    <string>dry_run</string>
+    <string>send_enabled</string>
   </dict>
 
   <key>StandardErrorPath</key>

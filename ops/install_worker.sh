@@ -18,4 +18,5 @@ launchctl enable "gui/$(id -u)/$LABEL"
 launchctl kickstart -k "gui/$(id -u)/$LABEL"
 
 echo "Installed $LABEL (repo: $REPO). Logs: worker/logs/worker.log"
-echo "Mode: dry_run — edit the plist's RNB_AUTOMATION_MODE to send_enabled at cutover, then re-run this script."
+MODE=$(grep -A1 RNB_AUTOMATION_MODE "$PLIST_DST" | grep string | sed 's/<[^>]*>//g' | tr -d ' \t')
+echo "Mode: $MODE (recipient allowlists per PILOT_* in .env.local)"

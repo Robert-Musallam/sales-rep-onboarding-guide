@@ -14,7 +14,10 @@ export interface ActionSpec {
 
 export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
   // Manager submitted the intake form (fired by the intake route, not a checklist item)
-  intake_submitted: [{ actionType: "rep.invite" }],
+  intake_submitted: [
+    { actionType: "rep.invite" },
+    { actionType: "jotform.mirror_intake" }, // keep form 261604930668664 as the registration record
+  ],
 
   // Rep info form received (fired by the Jotform webhook edge function)
   info_submitted: [

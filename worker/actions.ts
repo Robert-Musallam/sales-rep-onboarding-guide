@@ -89,11 +89,12 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     }
     if (!submissionId) {
       const formId = (await getSetting<string>("jotform_info_form_id")) ?? "";
-      // Prefill name so the rep's form opens with identity attached. Field qids
-      // follow the live form (q3 full name); extend via Settings if the form changes.
-      const created = await jotform.createPrefilledSubmission(formId, {
-        "3_first": rep.first_name,
-        "3_last": rep.last_name,
+      // Prefill fields 41/42/43 (phone/first/last) — the exact fields the Make
+      // scenario prefilled on the live "Onboarding Basic Information" form.
+      const created = await jotform.createSubmission(formId, {
+        "41": jotform.prettyPhone(rep.phone_e164),
+        "42": rep.first_name,
+        "43": rep.last_name,
       });
       submissionId = created.submissionId;
       await updateRep(repId, { jotform_info_submission_id: submissionId });
@@ -101,6 +102,54 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     return sendTemplatedSms(rep, "sms.invite", {
       info_form_link: `https://www.jotform.com/edit/${submissionId}`,
     });
+  },
+
+  /**
+   * Mirror the native /intake submission into the manager form
+   * (261604930668664) so it remains the registration record. The edge function
+   * recognizes mirrored submissions via the form_submissions row written here
+   * and skips re-ingesting them.
+   */
+  "jotform.mirror_intake": async (repId) => {
+    const rep = await loadRep(repId);
+    const { data: existing } = await db()
+      .schema(ONBOARDING)
+      .from("form_submissions")
+      .select("id")
+      .eq("rep_id", repId)
+      .eq("source", "native_mirror")
+      .maybeSingle();
+    if (existing) return { done: true, note: "already mirrored" };
+
+    const formId = (await getSetting<string>("jotform_manager_form_id")) ?? "";
+    if (!formId) throw new Error("app_settings.jotform_manager_form_id is empty");
+    const fields: Record<string, string> = {
+      "3_first": rep.first_name,
+      "3_last": rep.last_name,
+      "8": rep.territory?.name ?? "",
+      "31": rep.manager_name ?? "",
+      "32": jotform.prettyPhone(rep.phone_e164),
+      "34": rep.personal_email ?? "",
+      "35": "Design Consultant",
+    };
+    const start = (rep as unknown as { expected_start?: string | null }).expected_start;
+    if (start) {
+      const [y, m, d] = start.split("-");
+      fields["36_month"] = String(Number(m));
+      fields["36_day"] = String(Number(d));
+      fields["36_year"] = y;
+    }
+    const { submissionId } = await jotform.createSubmission(formId, fields);
+    const { error } = await db().schema(ONBOARDING).from("form_submissions").insert({
+      source: "native_mirror",
+      form_id: formId,
+      submission_id: submissionId,
+      rep_id: repId,
+      payload: fields,
+    });
+    if (error) throw new Error(`mirror record: ${error.message}`);
+    await logActivity(repId, "intake_mirrored", `Registration mirrored to Jotform (${submissionId})`);
+    return { done: true, note: submissionId };
   },
 
   /** Generic templated SMS (payload.template_key). */
