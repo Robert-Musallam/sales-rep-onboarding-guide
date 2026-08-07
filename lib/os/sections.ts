@@ -63,6 +63,17 @@ export const SECTIONS: Section[] = [
       "Curriculum and readiness test administration: courses, lessons, quizzes, and each rep's attempts. Reps take the test from their personal onboarding link.",
   },
   {
+    key: "guide",
+    label: "Manager's Guide",
+    href: "/guide",
+    icon: "guide",
+    kind: "view",
+    status: "live",
+    enabled: true,
+    blurb:
+      "The step-by-step manager's guide: what to do, what happens automatically, and who gets looped in.",
+  },
+  {
     key: "settings",
     label: "Settings",
     href: "/settings",

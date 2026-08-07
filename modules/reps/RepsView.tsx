@@ -18,10 +18,19 @@ const STAGES = (["invited", "info_submitted", "contract_sent", "contract_signed"
   (s) => ({ key: s, label: STATUS_LABEL[s] }),
 );
 
-export function RepsView({ initialReps }: { initialReps: Rep[] }) {
+export function RepsView({
+  initialReps,
+  managers = [],
+  defaultManager = "",
+}: {
+  initialReps: Rep[];
+  managers?: string[];
+  defaultManager?: string;
+}) {
   const [reps, setReps] = useState<Rep[]>(initialReps);
   const [view, setView] = useState<"board" | "grid">("board");
   const [openId, setOpenId] = useState<number | null>(null);
+  const [managerFilter, setManagerFilter] = useState(defaultManager);
   const params = useSearchParams();
 
   const refresh = useCallback(async () => {
@@ -42,13 +51,35 @@ export function RepsView({ initialReps }: { initialReps: Rep[] }) {
   }, [params]);
 
   const openRep = useMemo(() => reps.find((r) => r.id === openId) ?? null, [reps, openId]);
-  const active = reps.filter((r) => r.status !== "inactive");
+  const visible = useMemo(
+    () =>
+      managerFilter
+        ? reps.filter((r) => (r.manager_name ?? "").toLowerCase() === managerFilter.toLowerCase())
+        : reps,
+    [reps, managerFilter],
+  );
+  const active = visible.filter((r) => r.status !== "inactive");
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-xl font-bold text-navy">Onboarding</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          {managers.length > 0 && (
+            <select
+              className="select !py-1.5"
+              value={managerFilter}
+              onChange={(e) => setManagerFilter(e.target.value)}
+              title="Filter by hiring manager"
+            >
+              <option value="">All managers</option>
+              {managers.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          )}
           <button className={`btn btn-sm ${view === "board" ? "btn-primary" : ""}`} onClick={() => setView("board")}>
             Board
           </button>
@@ -62,7 +93,7 @@ export function RepsView({ initialReps }: { initialReps: Rep[] }) {
         <KpiCard label="In pipeline" value={String(active.filter((r) => r.status !== "active").length)} tone="navy" />
         <KpiCard label="Awaiting info form" value={String(active.filter((r) => r.status === "invited").length)} tone="amber" />
         <KpiCard label="Provisioning" value={String(active.filter((r) => r.status === "provisioning").length)} tone="teal" />
-        <KpiCard label="Active reps" value={String(reps.filter((r) => r.status === "active").length)} tone="green" />
+        <KpiCard label="Active reps" value={String(visible.filter((r) => r.status === "active").length)} tone="green" />
       </KpiHeader>
 
       {view === "board" ? (
@@ -87,7 +118,7 @@ export function RepsView({ initialReps }: { initialReps: Rep[] }) {
           )}
         />
       ) : (
-        <Grid data={reps} columns={repColumns} onRowClick={(r) => setOpenId(r.id)} emptyMessage="No reps yet — kick one off from New Rep." />
+        <Grid data={visible} columns={repColumns} onRowClick={(r) => setOpenId(r.id)} emptyMessage="No reps yet — kick one off from New Rep." />
       )}
 
       {openRep && <RepDrawer rep={openRep} onClose={() => setOpenId(null)} onChanged={refresh} />}
