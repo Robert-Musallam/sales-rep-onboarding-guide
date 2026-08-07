@@ -103,22 +103,28 @@ export async function createUser(opts: {
   const mailNickname = `${opts.firstName[0]}${opts.lastName}`.toLowerCase().replace(/[^a-z0-9]/g, "");
   const upn = `${mailNickname}@${opts.domain}`;
   const tempPassword = generateTempPassword();
-  const j = await must(
-    await graphFetch(token, "/users", {
-      method: "POST",
-      body: JSON.stringify({
-        accountEnabled: true,
-        displayName: `${opts.firstName[0]}${opts.lastName}`,
-        givenName: opts.firstName,
-        surname: opts.lastName,
-        mailNickname,
-        userPrincipalName: upn,
-        passwordProfile: { password: tempPassword, forceChangePasswordNextSignIn: true },
-      }),
+  const res = await graphFetch(token, "/users", {
+    method: "POST",
+    body: JSON.stringify({
+      accountEnabled: true,
+      displayName: `${opts.firstName[0]}${opts.lastName}`,
+      givenName: opts.firstName,
+      surname: opts.lastName,
+      mailNickname,
+      userPrincipalName: upn,
+      passwordProfile: { password: tempPassword, forceChangePasswordNextSignIn: true },
     }),
-    "graph createUser",
-  );
-  return { userId: j.id as string, upn, tempPassword };
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    // 400/409 (e.g. UPN already exists) won't fix itself — fail fast so the
+    // full Graph error surfaces in the drawer immediately instead of after
+    // five backoff retries.
+    const prefix = res.status === 400 || res.status === 409 ? "PERMANENT: " : "";
+    throw new Error(`${prefix}graph createUser (upn ${upn}): ${res.status} ${text}`);
+  }
+  const j = (await res.json()) as { id: string };
+  return { userId: j.id, upn, tempPassword };
 }
 
 export async function findUserByUpn(upn: string): Promise<{ id: string } | null> {

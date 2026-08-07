@@ -96,7 +96,8 @@ async function pass(): Promise<void> {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const attempts = row.attempts + 1;
-      if (attempts >= MAX_ATTEMPTS) {
+      const permanent = msg.startsWith("PERMANENT: ");
+      if (permanent || attempts >= MAX_ATTEMPTS) {
         await db()
           .schema(ONBOARDING)
           .from("outbox")
