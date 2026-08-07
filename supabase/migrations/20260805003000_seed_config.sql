@@ -67,8 +67,8 @@ on conflict (key) do nothing;
 insert into onboarding.checklist_templates (key, label, sort_order, automation_key, auto, description) values
   ('gusto',            'Gusto: rep added + contract sent',        10, 'gusto_done',    false, 'Manual in Gusto (pick territory, add rep, send contract). Checking creates the Microsoft user.'),
   ('business_license', 'Business license',                        20, null,            false, 'Manual verification.'),
-  ('m365_license',     'Microsoft license assigned',              30, 'license_done',  false, 'Manual purchase/assign in M365 admin. Checking fires the full Teams/email welcome bundle.'),
-  ('welcome_message',  'Welcome message sent',                    40, null,            true,  'Completed automatically by the welcome bundle.'),
+  ('m365_license',     'Microsoft license assigned',              30, 'license_done',  false, 'Manual purchase/assign in M365 admin. Checking fires DM, Phone Room, territory chats + app SMS.'),
+  ('welcome_message',  'Welcome message sent',                    40, 'welcome_done',  false, 'Checking posts the company-wide announcement and sends the welcome email.'),
   ('team_channel',     'Team channels created',                   50, null,            true,  'Completed automatically by the welcome bundle.'),
   ('hcp_user',         'Housecall Pro user created',              60, 'hcp_done',      false, 'Checking creates the HCP employee in the rep''s territory via API.'),
   ('greensky',         'GreenSky approval submitted',             70, null,            false, 'Rep-driven; instructions surface on the rep''s onboarding hub.'),

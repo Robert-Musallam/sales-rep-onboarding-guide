@@ -28,20 +28,26 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
   // Checklist: "Gusto: rep added + contract sent" checked
   gusto_done: [{ actionType: "m365.create_user" }],
 
-  // Checklist: "Microsoft license assigned" checked — the full welcome bundle
+  // Checklist: "Microsoft license assigned" checked — Teams infrastructure + app SMS.
+  // (Company-wide announcement + welcome email live on the separate
+  // "Welcome message" check so one click doesn't blast everything at once.)
   license_done: [
     { actionType: "teams.create_dm" },
     { actionType: "teams.create_phone_room" },
     { actionType: "teams.add_territory_chats", delayMinutes: 2 },
     { actionType: "compat.employee_teams_chats", delayMinutes: 3 },
-    { actionType: "teams.company_announcement", delayMinutes: 1 },
-    { actionType: "email.welcome", delayMinutes: 1 },
     { actionType: "sms.app_download", delayMinutes: 1 },
     {
       actionType: "checklist.autocomplete",
       delayMinutes: 4,
-      payload: { keys: ["welcome_message", "team_channel"] },
+      payload: { keys: ["team_channel"] },
     },
+  ],
+
+  // Checklist: "Welcome message" checked — the public-facing welcome.
+  welcome_done: [
+    { actionType: "teams.company_announcement" },
+    { actionType: "email.welcome" },
   ],
 
   // Checklist: "Housecall Pro user created" checked
