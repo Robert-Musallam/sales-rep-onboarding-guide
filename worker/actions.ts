@@ -71,9 +71,18 @@ async function sendTemplatedSms(rep: Rep, templateKey: string, extraVars: Record
   const verdict = gate("sms", rep.phone_e164);
   if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would text ${rep.phone_e164}: ${body.slice(0, 120)}…` };
   const from = (await getSetting<string>("dialpad_from_number")) ?? "";
-  await dialpad.sendSms({ from, to: rep.phone_e164, text: body });
-  await logActivity(rep.id, "sms_sent", `Texted ${rep.phone_e164} (${templateKey})`);
-  return { done: true };
+  const dp = await dialpad.sendSms({ from, to: rep.phone_e164, text: body });
+  // Full message body + Dialpad response land on the timeline; the outbox row
+  // keeps a compact receipt (shown in the drawer's Automations list).
+  await logActivity(rep.id, "sms_sent", `Texted ${rep.phone_e164} (${templateKey}): "${body}"`, {
+    template_key: templateKey,
+    to: rep.phone_e164,
+    from,
+    body,
+    dialpad: dp,
+  });
+  const receipt = `dialpad id ${dp.id ?? "?"}${dp.status ? ` · status ${dp.status}` : ""}`;
+  return { done: true, note: `→ ${rep.phone_e164} (${templateKey}) · ${receipt}` };
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────────────

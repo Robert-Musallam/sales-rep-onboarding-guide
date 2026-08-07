@@ -22,7 +22,13 @@ export function toE164(raw: string): string {
   throw new DialpadSendError(`cannot normalize phone number: ${raw}`);
 }
 
-export async function sendSms(opts: { from: string; to: string; text: string }): Promise<{ id?: string }> {
+export interface DialpadSmsResult {
+  id?: string | number;
+  status?: string;
+  [k: string]: unknown;
+}
+
+export async function sendSms(opts: { from: string; to: string; text: string }): Promise<DialpadSmsResult> {
   const res = await fetch(`${ENV.dialpadBaseUrl()}/sms`, {
     method: "POST",
     headers: {
@@ -38,5 +44,5 @@ export async function sendSms(opts: { from: string; to: string; text: string }):
   if (!res.ok) {
     throw new DialpadSendError(`dialpad sms: ${res.status} ${await res.text()}`, res.status);
   }
-  return (await res.json().catch(() => ({}))) as { id?: string };
+  return (await res.json().catch(() => ({}))) as DialpadSmsResult;
 }

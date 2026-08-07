@@ -82,7 +82,14 @@ async function pass(): Promise<void> {
         await db()
           .schema(ONBOARDING)
           .from("outbox")
-          .update({ state: "done", executed_at: new Date().toISOString(), last_error: null })
+          .update({
+            state: "done",
+            executed_at: new Date().toISOString(),
+            last_error: null,
+            // Receipt (e.g. "→ +1408… · dialpad id 123 · status pending") —
+            // surfaces in the drawer's Automations list.
+            dry_run_log: result.note ? { note: result.note } : null,
+          })
           .eq("id", row.id);
         console.log(`${label} DONE${result.note ? `: ${result.note}` : ""}`);
       }
