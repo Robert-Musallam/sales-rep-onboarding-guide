@@ -47,3 +47,6 @@ leasing_read_smoke.mjs
 # worker runtime artifacts
 worker/logs/
 worker/.worker.lock
+
+# local credential prep (never commit)
+ops/manager-accounts.local.json
