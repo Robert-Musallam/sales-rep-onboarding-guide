@@ -21,6 +21,19 @@ export async function fetchReps(): Promise<Rep[]> {
   return (data ?? []) as unknown as Rep[];
 }
 
+/** Manager names for the intake dropdown (app_settings.managers, Settings-editable). */
+export async function fetchManagers(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .schema(ONBOARDING_SCHEMA)
+    .from("app_settings")
+    .select("value")
+    .eq("key", "managers")
+    .maybeSingle();
+  if (error || !Array.isArray(data?.value)) return [];
+  return data.value as string[];
+}
+
 export async function fetchTerritories(): Promise<Territory[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

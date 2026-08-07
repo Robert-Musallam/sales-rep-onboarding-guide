@@ -10,7 +10,7 @@ import type { Territory } from "@/modules/reps/types";
  * Submitting creates the rep + checklist and queues the invite SMS (with the
  * pre-filled rep-info Jotform link) for the worker.
  */
-export function IntakeForm({ territories }: { territories: Territory[] }) {
+export function IntakeForm({ territories, managers }: { territories: Territory[]; managers: string[] }) {
   const router = useRouter();
   const [f, setF] = useState({
     first_name: "",
@@ -69,8 +69,8 @@ export function IntakeForm({ territories }: { territories: Territory[] }) {
               required
             />
           </Field>
-          <Field label="Personal email">
-            <input className="input w-full" type="email" value={f.personal_email} onChange={(e) => set("personal_email", e.target.value)} />
+          <Field label="Personal email" required>
+            <input className="input w-full" type="email" value={f.personal_email} onChange={(e) => set("personal_email", e.target.value)} required />
           </Field>
           <Field label="Territory" required>
             <select className="select w-full" value={f.territory_id} onChange={(e) => set("territory_id", e.target.value)} required>
@@ -82,11 +82,25 @@ export function IntakeForm({ territories }: { territories: Territory[] }) {
               ))}
             </select>
           </Field>
-          <Field label="Hiring manager">
-            <input className="input w-full" value={f.manager_name} onChange={(e) => set("manager_name", e.target.value)} />
+          <Field label="Hiring manager" required>
+            <select className="select w-full" value={f.manager_name} onChange={(e) => set("manager_name", e.target.value)} required>
+              <option value="">Select…</option>
+              {managers.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
           </Field>
-          <Field label="Expected start">
-            <input className="input w-full" type="date" value={f.expected_start} onChange={(e) => set("expected_start", e.target.value)} />
+          <Field label="Expected start" required>
+            <input
+              className="input w-full"
+              type="date"
+              min={new Date().toISOString().slice(0, 10)}
+              value={f.expected_start}
+              onChange={(e) => set("expected_start", e.target.value)}
+              required
+            />
           </Field>
           <Field label="How did they hear about us?">
             <input className="input w-full" value={f.how_heard} onChange={(e) => set("how_heard", e.target.value)} />
