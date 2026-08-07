@@ -34,36 +34,44 @@ export async function resolveHcpKey(opts: {
   );
 }
 
-export async function createEmployee(opts: {
+/**
+ * The public HCP API cannot CREATE employees (POST /employees does not exist —
+ * confirmed 404 on 2026-08-07). Creation stays manual in the HCP UI (browser
+ * agent later); this looks the employee up by email/name so checking the box
+ * VERIFIES the account exists and records its id.
+ */
+export async function findEmployee(opts: {
   apiKeyEnv?: string | null;
   territoryName?: string | null;
+  email?: string | null;
   firstName: string;
   lastName: string;
-  email: string;
-  phone?: string | null;
-  role?: string;
-}): Promise<{ id?: string; raw: unknown }> {
+}): Promise<{ id: string; email: string | null; matchedBy: "email" | "name" } | null> {
   const key = await resolveHcpKey(opts);
-  const res = await fetch(`${ENV.hcpBaseUrl()}/employees`, {
-    method: "POST",
-    headers: {
-      Authorization: `Token ${key}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      first_name: opts.firstName,
-      last_name: opts.lastName,
-      email: opts.email,
-      mobile_number: opts.phone ?? undefined,
-      role: opts.role ?? "field tech",
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`hcp createEmployee: ${res.status} ${await res.text()}`);
+  const wantEmail = (opts.email ?? "").toLowerCase();
+  const wantName = `${opts.firstName} ${opts.lastName}`.toLowerCase();
+  for (let page = 1; page <= 5; page++) {
+    const res = await fetch(`${ENV.hcpBaseUrl()}/employees?page=${page}&page_size=100`, {
+      headers: { Authorization: `Token ${key}`, Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`hcp listEmployees: ${res.status} ${await res.text()}`);
+    const j = (await res.json()) as {
+      employees?: Array<{ id: string; email?: string; first_name?: string; last_name?: string }>;
+    };
+    const list = j.employees ?? [];
+    for (const e of list) {
+      if (wantEmail && (e.email ?? "").toLowerCase() === wantEmail) {
+        return { id: e.id, email: e.email ?? null, matchedBy: "email" };
+      }
+    }
+    for (const e of list) {
+      if (`${e.first_name ?? ""} ${e.last_name ?? ""}`.toLowerCase() === wantName) {
+        return { id: e.id, email: e.email ?? null, matchedBy: "name" };
+      }
+    }
+    if (list.length < 100) break;
   }
-  const j = (await res.json().catch(() => ({}))) as { id?: string };
-  return { id: j.id, raw: j };
+  return null;
 }
 
 /** Cheap credential check used by scripts/verify_hcp.ts and the health panel. */

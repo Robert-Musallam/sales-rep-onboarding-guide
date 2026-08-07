@@ -70,7 +70,7 @@ insert into onboarding.checklist_templates (key, label, sort_order, automation_k
   ('m365_license',     'Microsoft license assigned',              30, 'license_done',  false, 'Manual purchase/assign in M365 admin. Checking fires DM, Phone Room, territory chats + app SMS.'),
   ('welcome_message',  'Welcome message sent',                    40, 'welcome_done',  false, 'Checking posts the company-wide announcement and sends the welcome email.'),
   ('team_channel',     'Team channels created',                   50, null,            true,  'Completed automatically by the welcome bundle.'),
-  ('hcp_user',         'Housecall Pro user created',              60, 'hcp_done',      false, 'Checking creates the HCP employee in the rep''s territory via API.'),
+  ('hcp_user',         'Housecall Pro user created',              60, 'hcp_done',      false, 'Create the employee manually in the HCP UI; checking verifies it via API and records the employee id.'),
   ('greensky',         'GreenSky approval submitted',             70, null,            false, 'Rep-driven; instructions surface on the rep''s onboarding hub.'),
   ('business_cards',   'Business cards ordered',                  80, 'cards_done',    false, 'Checking emails the business-card contact with the rep''s details.'),
   ('training',         'Training curriculum passed',              90, null,            true,  'Completed automatically when the rep passes the final quiz.')

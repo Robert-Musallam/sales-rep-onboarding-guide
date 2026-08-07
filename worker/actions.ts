@@ -333,23 +333,34 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
   },
 
   /** HCP checked → create the employee in the territory's HCP company. */
-  "hcp.create_employee": async (repId) => {
+  /**
+   * HCP checked → VERIFY the employee exists in the territory's HCP company and
+   * record its id. (The public HCP API cannot create employees — POST /employees
+   * 404s, confirmed 2026-08-07. Creation stays manual in the HCP UI; a browser
+   * agent can take it over later.)
+   */
+  "hcp.verify_employee": async (repId) => {
     const rep = await loadRep(repId);
-    if (rep.hcp_employee_id) return { done: true, note: "HCP employee already created" };
-    if (!rep.rnb_email) throw new Error("rep has no rnb_email yet");
-    const verdict = gate("provision");
-    if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would create HCP employee` };
-    const { id } = await hcp.createEmployee({
+    if (rep.hcp_employee_id) return { done: true, note: "HCP employee already verified" };
+    const found = await hcp.findEmployee({
       apiKeyEnv: rep.territory?.hcp_api_key_env,
       territoryName: rep.territory?.name,
+      email: rep.rnb_email,
       firstName: rep.first_name,
       lastName: rep.last_name,
-      email: rep.rnb_email,
-      phone: rep.phone_e164,
     });
-    await updateRep(repId, { hcp_employee_id: id ?? "created" });
-    await logActivity(repId, "hcp_user_created", `Created HCP employee${id ? ` (${id})` : ""}`);
-    return { done: true };
+    if (!found) {
+      throw new Error(
+        `No employee matching ${rep.rnb_email ?? `${rep.first_name} ${rep.last_name}`} in the ${rep.territory?.name ?? "?"} HCP — create them in the HCP UI first, then Retry`,
+      );
+    }
+    await updateRep(repId, { hcp_employee_id: found.id });
+    await logActivity(
+      repId,
+      "hcp_user_verified",
+      `Verified HCP employee ${found.id} (matched by ${found.matchedBy}${found.email ? `, ${found.email}` : ""})`,
+    );
+    return { done: true, note: `HCP ${found.id} · matched by ${found.matchedBy}` };
   },
 
   /** Business-card request email to the configured contact. */

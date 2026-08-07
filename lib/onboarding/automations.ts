@@ -51,7 +51,7 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
   ],
 
   // Checklist: "Housecall Pro user created" checked
-  hcp_done: [{ actionType: "hcp.create_employee" }],
+  hcp_done: [{ actionType: "hcp.verify_employee" }],
 
   // Checklist: "Business cards ordered" checked
   cards_done: [{ actionType: "email.business_cards" }],
