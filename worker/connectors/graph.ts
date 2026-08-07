@@ -100,7 +100,16 @@ export async function createUser(opts: {
   domain: string;
 }): Promise<{ userId: string; upn: string; tempPassword: string }> {
   const token = await getAppToken();
-  const mailNickname = `${opts.firstName[0]}${opts.lastName}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const base = `${opts.firstName[0]}${opts.lastName}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  // Collision rule: initial+lastname, then numeric suffix (rmusallam → rmusallam2 → …)
+  // until a free UPN is found.
+  let mailNickname = base;
+  for (let n = 2; n <= 20; n++) {
+    if (!(await findUserByUpn(`${mailNickname}@${opts.domain}`))) break;
+    mailNickname = `${base}${n}`;
+  }
+
   const upn = `${mailNickname}@${opts.domain}`;
   const tempPassword = generateTempPassword();
   const res = await graphFetch(token, "/users", {
