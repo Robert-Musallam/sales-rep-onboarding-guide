@@ -10,7 +10,7 @@ import { ONBOARDING_SCHEMA } from "@/lib/os/schemas";
 import { fmtDate } from "@/lib/utils";
 import { repsApi } from "./api-client";
 import { ItemStatusBadge, OutboxStateBadge, RepStatusBadge, STATUS_LABEL } from "./badges";
-import type { ChecklistItem, OutboxRow, Rep, RepStatus } from "./types";
+import type { ChecklistItem, OutboxRow, Rep, RepStatus, Territory } from "./types";
 import { REP_STATUSES } from "./types";
 
 const ACTIVITY_ICONS: Record<string, string> = {
@@ -42,6 +42,7 @@ export function RepDrawer({
 }) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [outbox, setOutbox] = useState<OutboxRow[]>([]);
+  const [territories, setTerritories] = useState<Territory[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [reload, setReload] = useState(0);
@@ -66,6 +67,13 @@ export function RepDrawer({
     ]);
     setItems((ci.data ?? []) as ChecklistItem[]);
     setOutbox((ob.data ?? []) as OutboxRow[]);
+    const { data: terr } = await supabase
+      .schema(ONBOARDING_SCHEMA)
+      .from("territories")
+      .select("*")
+      .eq("active", true)
+      .order("name");
+    setTerritories((terr ?? []) as Territory[]);
   }, [rep.id]);
 
   useEffect(() => {
@@ -116,6 +124,23 @@ export function RepDrawer({
     >
       {/* Contact + provisioning facts */}
       <ActionBar title="Profile">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px] mb-2">
+          <div className="text-muted">Location</div>
+          <select
+            className="select !py-1 !text-[13px]"
+            value={rep.territory_id ?? ""}
+            onChange={(e) => run(() => repsApi.update(rep.id, { territory_id: Number(e.target.value) }))}
+          >
+            <option value="" disabled>
+              Select…
+            </option>
+            {territories.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px]">
           <Fact label="Phone" value={rep.phone_e164} />
           <Fact label="Phone OS" value={rep.phone_os} />
