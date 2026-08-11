@@ -6,25 +6,21 @@ import { RepsView } from "@/modules/reps/RepsView";
 export const dynamic = "force-dynamic";
 
 export default async function RepsPage() {
-  const [reps, managers, session] = await Promise.all([
-    fetchReps(),
-    fetchManagers(),
-    getSessionUser(),
-  ]);
+  const session = await getSessionUser();
 
-  // Managers land filtered to their own reps by default (matched by name
-  // against the manager dropdown); admins/staff see everything. Just a default —
-  // anyone can switch the filter to any manager or "All".
-  const fullName = session?.profile?.full_name ?? "";
-  const defaultManager =
-    session?.profile?.role === "manager" &&
-    managers.some((m) => m.toLowerCase() === fullName.toLowerCase())
-      ? managers.find((m) => m.toLowerCase() === fullName.toLowerCase())!
-      : "";
+  // Managers only see their own reps (the ones they registered); admins/staff
+  // see everything with the manager filter available.
+  const restrictedTo =
+    session?.profile?.role === "manager" ? (session.profile.full_name ?? "") : null;
+
+  const [reps, managers] = await Promise.all([
+    fetchReps(restrictedTo),
+    restrictedTo ? Promise.resolve([]) : fetchManagers(),
+  ]);
 
   return (
     <Suspense fallback={null}>
-      <RepsView initialReps={reps} managers={managers} defaultManager={defaultManager} />
+      <RepsView initialReps={reps} managers={managers} restrictedTo={restrictedTo} />
     </Suspense>
   );
 }

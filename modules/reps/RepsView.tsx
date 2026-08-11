@@ -21,27 +21,30 @@ const STAGES = (["invited", "info_submitted", "contract_sent", "contract_signed"
 export function RepsView({
   initialReps,
   managers = [],
-  defaultManager = "",
+  restrictedTo = null,
 }: {
   initialReps: Rep[];
   managers?: string[];
-  defaultManager?: string;
+  /** Set for manager-role users: they only ever see their own reps. */
+  restrictedTo?: string | null;
 }) {
   const [reps, setReps] = useState<Rep[]>(initialReps);
   const [view, setView] = useState<"board" | "grid">("board");
   const [openId, setOpenId] = useState<number | null>(null);
-  const [managerFilter, setManagerFilter] = useState(defaultManager);
+  const [managerFilter, setManagerFilter] = useState("");
   const params = useSearchParams();
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase
+    let query = supabase
       .schema(ONBOARDING_SCHEMA)
       .from("reps")
       .select("*, territory:territories(id, name)")
       .order("created_at", { ascending: false });
+    if (restrictedTo) query = query.ilike("manager_name", restrictedTo);
+    const { data } = await query;
     if (data) setReps(data as unknown as Rep[]);
-  }, []);
+  }, [restrictedTo]);
 
   // Deep link: /reps?open=<id> (used by Teams notifications).
   useEffect(() => {
@@ -65,7 +68,7 @@ export function RepsView({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-xl font-bold text-navy">Onboarding</h1>
         <div className="flex gap-2 items-center flex-wrap">
-          {managers.length > 0 && (
+          {!restrictedTo && managers.length > 0 && (
             <select
               className="select !py-1.5"
               value={managerFilter}

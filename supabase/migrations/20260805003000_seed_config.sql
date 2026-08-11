@@ -66,7 +66,6 @@ on conflict (key) do nothing;
 -- the system when their bundle finishes, matching today's Make behavior.
 insert into onboarding.checklist_templates (key, label, sort_order, automation_key, auto, description) values
   ('gusto',            'Gusto: rep added + contract sent',        10, 'gusto_done',    false, 'Manual in Gusto (pick territory, add rep, send contract). Checking creates the Microsoft user.'),
-  ('business_license', 'Business license',                        20, null,            false, 'Manual verification.'),
   ('m365_license',     'Microsoft license assigned',              30, 'license_done',  false, 'Manual purchase/assign in M365 admin. Checking fires DM, Phone Room, territory chats + app SMS.'),
   ('welcome_message',  'Welcome message sent',                    40, 'welcome_done',  false, 'Checking posts the company-wide announcement and sends the welcome email.'),
   ('team_channel',     'Team channels created',                   50, null,            true,  'Completed automatically by the welcome bundle.'),

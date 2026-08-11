@@ -21,7 +21,6 @@ export function IntakeForm({ territories, managers }: { territories: Territory[]
     manager_name: "",
     expected_start: "",
     how_heard: "",
-    is_test: false,
   });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -106,11 +105,6 @@ export function IntakeForm({ territories, managers }: { territories: Territory[]
             <input className="input w-full" value={f.how_heard} onChange={(e) => set("how_heard", e.target.value)} />
           </Field>
         </div>
-
-        <label className="flex items-center gap-2 text-[13px] text-muted">
-          <input type="checkbox" checked={f.is_test} onChange={(e) => set("is_test", e.target.checked)} />
-          Test rep (automations run against pilot allowlists only)
-        </label>
 
         {err && (
           <div className="text-[12px] text-red bg-red/10 border border-red/20 rounded-lg px-3 py-2">{err}</div>

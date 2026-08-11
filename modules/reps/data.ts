@@ -7,13 +7,19 @@ import type { Rep, Territory } from "./types";
  * inherited from the gcv-renewals per-module data.ts files) — the page renders
  * an honest empty state instead of a 500.
  */
-export async function fetchReps(): Promise<Rep[]> {
+/**
+ * Reps list. When `restrictToManager` is set (manager-role users), only reps
+ * whose hiring manager matches — managers see exactly the reps they created.
+ */
+export async function fetchReps(restrictToManager?: string | null): Promise<Rep[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .schema(ONBOARDING_SCHEMA)
     .from("reps")
     .select("*, territory:territories(id, name)")
     .order("created_at", { ascending: false });
+  if (restrictToManager) query = query.ilike("manager_name", restrictToManager);
+  const { data, error } = await query;
   if (error) {
     console.error("fetchReps:", error.message);
     return [];
