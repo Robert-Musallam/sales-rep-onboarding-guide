@@ -23,6 +23,11 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
   info_submitted: [
     { actionType: "teams.notify_info_submitted" },
     { actionType: "sms.send", payload: { template_key: "sms.gusto_contract" } },
+    // Copy of the Gusto text to the ops number (app_settings.gusto_sms_copy_to)
+    {
+      actionType: "sms.send",
+      payload: { template_key: "sms.gusto_contract", to_setting: "gusto_sms_copy_to" },
+    },
   ],
 
   // Checklist: "Gusto: rep added + contract sent" checked

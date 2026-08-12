@@ -65,24 +65,30 @@ function repVars(rep: Rep): Record<string, string | null> {
   };
 }
 
-async function sendTemplatedSms(rep: Rep, templateKey: string, extraVars: Record<string, string> = {}): Promise<ActionResult> {
-  if (!rep.phone_e164) throw new Error(`rep ${rep.id} has no phone number`);
+async function sendTemplatedSms(
+  rep: Rep,
+  templateKey: string,
+  extraVars: Record<string, string> = {},
+  toOverride?: string,
+): Promise<ActionResult> {
+  const to = toOverride ?? rep.phone_e164;
+  if (!to) throw new Error(`rep ${rep.id} has no phone number`);
   const { body } = await renderTemplate(templateKey, { ...repVars(rep), ...extraVars });
-  const verdict = gate("sms", rep.phone_e164);
-  if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would text ${rep.phone_e164}: ${body.slice(0, 120)}…` };
+  const verdict = gate("sms", to);
+  if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would text ${to}: ${body.slice(0, 120)}…` };
   const from = (await getSetting<string>("dialpad_from_number")) ?? "";
-  const dp = await dialpad.sendSms({ from, to: rep.phone_e164, text: body });
+  const dp = await dialpad.sendSms({ from, to, text: body });
   // Full message body + Dialpad response land on the timeline; the outbox row
   // keeps a compact receipt (shown in the drawer's Automations list).
-  await logActivity(rep.id, "sms_sent", `Texted ${rep.phone_e164} (${templateKey}): "${body}"`, {
+  await logActivity(rep.id, "sms_sent", `Texted ${to} (${templateKey}): "${body}"`, {
     template_key: templateKey,
-    to: rep.phone_e164,
+    to,
     from,
     body,
     dialpad: dp,
   });
   const receipt = `dialpad id ${dp.id ?? "?"}${dp.status ? ` · status ${dp.status}` : ""}`;
-  return { done: true, note: `→ ${rep.phone_e164} (${templateKey}) · ${receipt}` };
+  return { done: true, note: `→ ${to} (${templateKey}) · ${receipt}` };
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -161,10 +167,21 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     return { done: true, note: submissionId };
   },
 
-  /** Generic templated SMS (payload.template_key). */
+  /**
+   * Generic templated SMS (payload.template_key). Optional recipient override:
+   * payload.to (explicit number) or payload.to_setting (app_settings key whose
+   * value is the number — empty setting = quietly skip).
+   */
   "sms.send": async (repId, payload) => {
     const rep = await loadRep(repId);
-    return sendTemplatedSms(rep, String(payload.template_key));
+    let toOverride: string | undefined;
+    if (payload.to) toOverride = String(payload.to);
+    else if (payload.to_setting) {
+      const v = (await getSetting<string>(String(payload.to_setting))) ?? "";
+      if (!v) return { done: true, note: `copy skipped — app_settings.${payload.to_setting} is empty` };
+      toOverride = v;
+    }
+    return sendTemplatedSms(rep, String(payload.template_key), {}, toOverride);
   },
 
   /** Teams notification into the notify chat when a rep submits their info form. */
