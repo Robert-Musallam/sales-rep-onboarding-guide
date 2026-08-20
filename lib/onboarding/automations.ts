@@ -22,12 +22,9 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
   // Rep info form received (fired by the Jotform webhook edge function)
   info_submitted: [
     { actionType: "teams.notify_info_submitted" },
+    // The ops copy is now sent globally for every outbound SMS by the worker
+    // (sendSmsCopy in worker/actions.ts), so no explicit copy action here.
     { actionType: "sms.send", payload: { template_key: "sms.gusto_contract" } },
-    // Copy of the Gusto text to the ops number (app_settings.gusto_sms_copy_to)
-    {
-      actionType: "sms.send",
-      payload: { template_key: "sms.gusto_contract", to_setting: "gusto_sms_copy_to" },
-    },
   ],
 
   // Checklist: "Gusto: rep added + contract sent" checked
