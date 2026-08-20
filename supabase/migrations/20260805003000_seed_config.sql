@@ -52,7 +52,8 @@ insert into onboarding.app_settings (key, value) values
   ('company_wide_chat_id',      '"19:4678713ea9514c688202de5cccaa905d@thread.v2"'),
   ('notify_chat_id',            '"19:meeting_MGRkMGViMzYtNjExOC00MjE1LThiMzUtN2MwN2QwNTMyODYw@thread.v2"'),
   ('dialpad_from_number',       '"+17027448078"'),
-  ('gusto_sms_copy_to',         '"+14084105938"'),  -- ops copy of the Gusto-contract text
+  ('sms_copy_to',               '"+14084105938"'),  -- ops copy of EVERY outbound SMS
+  ('gusto_sms_copy_to',         '"+14084105938"'),  -- legacy (superseded by sms_copy_to)
   ('welcome_email_sender',      '""'),   -- REQUIRED before go-live (SETUP.md §2) — deliberately NOT info.colorado
   ('welcome_email_bcc',         '["josebrest25@gmail.com", "Rmusallam@rocknblocklandscape.com"]'),
   ('business_card_contact_email', '""'), -- fill in Settings before enabling that step

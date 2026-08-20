@@ -88,7 +88,55 @@ async function sendTemplatedSms(
     dialpad: dp,
   });
   const receipt = `dialpad id ${dp.id ?? "?"}${dp.status ? ` · status ${dp.status}` : ""}`;
+  // Every SMS that goes to a rep's own phone also gets copied to the ops number.
+  // Only primary sends copy (toOverride sends are themselves copies/redirects),
+  // which prevents a copy from copying itself.
+  if (!toOverride) await sendSmsCopy(rep, templateKey, body);
   return { done: true, note: `→ ${to} (${templateKey}) · ${receipt}` };
+}
+
+/** last-10-digits comparison so +1XXXXXXXXXX and (XXX) XXX-XXXX match. */
+function sameNumber(a?: string | null, b?: string | null): boolean {
+  const da = (a ?? "").replace(/\D/g, "").slice(-10);
+  const db = (b ?? "").replace(/\D/g, "").slice(-10);
+  return da.length === 10 && da === db;
+}
+
+/**
+ * Ops copy of any outbound SMS → app_settings.sms_copy_to (falls back to the
+ * legacy gusto_sms_copy_to so this works before the new setting is seeded).
+ * BEST-EFFORT: never throws. The primary SMS already sent; throwing here would
+ * make the executor retry the whole action and re-text the rep.
+ */
+async function sendSmsCopy(rep: Rep, templateKey: string, body: string): Promise<void> {
+  try {
+    const copyTo =
+      (await getSetting<string>("sms_copy_to")) ||
+      (await getSetting<string>("gusto_sms_copy_to")) ||
+      "";
+    if (!copyTo) return;
+    if (sameNumber(rep.phone_e164, copyTo)) return; // rep is the ops number — don't double-text
+    const verdict = gate("sms", copyTo);
+    if (!verdict.allowed) {
+      await logActivity(rep.id, "sms_copy_skipped", `Ops copy to ${copyTo} skipped: ${verdict.reason}`, {
+        to: copyTo,
+        template_key: templateKey,
+      });
+      return;
+    }
+    const from = (await getSetting<string>("dialpad_from_number")) ?? "";
+    const text = `[copy → ${rep.first_name} ${rep.last_name}] ${body}`;
+    const dp = await dialpad.sendSms({ from, to: copyTo, text });
+    await logActivity(rep.id, "sms_copy_sent", `Copied ${templateKey} SMS to ops ${copyTo}`, {
+      to: copyTo,
+      from,
+      body: text,
+      template_key: templateKey,
+      dialpad: dp,
+    });
+  } catch (e) {
+    await logActivity(rep.id, "sms_copy_failed", `Ops SMS copy failed: ${(e as Error).message}`).catch(() => {});
+  }
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────────────

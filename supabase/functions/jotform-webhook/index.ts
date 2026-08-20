@@ -183,14 +183,9 @@ async function handleInfoForm(submissionId: string, raw: Record<string, unknown>
   await supabase.schema("onboarding").from("form_submissions").update({ rep_id: rep.id }).eq("submission_id", submissionId);
   await enqueue([
     { action_type: "teams.notify_info_submitted", rep_id: rep.id, payload: {}, dedupe_key: `info_submitted:teams.notify_info_submitted:${rep.id}` },
+    // The worker copies every outbound SMS to the ops number globally, so no
+    // explicit gusto copy action here.
     { action_type: "sms.send", rep_id: rep.id, payload: { template_key: "sms.gusto_contract" }, dedupe_key: `info_submitted:sms.send:${rep.id}` },
-    // Copy of the Gusto text to the ops number (app_settings.gusto_sms_copy_to)
-    {
-      action_type: "sms.send",
-      rep_id: rep.id,
-      payload: { template_key: "sms.gusto_contract", to_setting: "gusto_sms_copy_to" },
-      dedupe_key: `info_submitted:sms.send.copy:${rep.id}`,
-    },
   ]);
   await logActivity(rep.id, "info_form_submitted", "Rep submitted their info form");
   return "ok (info ingested)";
