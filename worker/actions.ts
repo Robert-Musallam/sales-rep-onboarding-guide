@@ -279,11 +279,15 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
       lastName: rep.last_name,
       domain,
     });
+    // Deliberately does NOT touch status: the Gusto check that fired this puts
+    // the rep in `contract_sent` (STATUS_ON_COMPLETE in lib/onboarding/
+    // automations.ts). Creating the mailbox early is an implementation detail —
+    // it should not jump the card to Provisioning while the contract is still
+    // out for signature.
     await updateRep(repId, {
       m365_user_id: userId,
       rnb_email: upn,
       m365_temp_password: tempPassword,
-      status: "provisioning",
     });
     await logActivity(repId, "m365_user_created", `Created Microsoft user ${upn}`);
     return { done: true, note: upn };

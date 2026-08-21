@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { ActionError, requireUser, logEntityActivity } from "@/lib/os/entity";
 import { ONBOARDING_SCHEMA, SHARED_SCHEMA } from "@/lib/os/schemas";
-import { outboxRowsFor } from "@/lib/onboarding/automations";
+import { outboxRowsFor, STATUS_ON_COMPLETE } from "@/lib/onboarding/automations";
+import { REP_STATUSES, type RepStatus } from "@/modules/reps/types";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (uErr) throw new ActionError(uErr.message, 500);
 
     let enqueued = 0;
+    let movedTo: string | null = null;
     if (action === "complete" && item.automation_key) {
       const rows = outboxRowsFor(item.automation_key, repId);
       if (rows.length) {
@@ -52,6 +54,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           .upsert(rows, { onConflict: "dedupe_key", ignoreDuplicates: true });
         if (oErr) throw new ActionError(oErr.message, 500);
         enqueued = rows.length;
+      }
+
+      // The check itself moves the card. Forward-only, so re-checking an item
+      // can never drag a rep back to an earlier column.
+      const target = STATUS_ON_COMPLETE[item.automation_key];
+      if (target) {
+        const { data: rep, error: rErr } = await supabase
+          .schema(ONBOARDING_SCHEMA)
+          .from("reps")
+          .select("status")
+          .eq("id", repId)
+          .maybeSingle();
+        if (rErr) throw new ActionError(rErr.message, 500);
+        const from = REP_STATUSES.indexOf((rep?.status ?? "invited") as RepStatus);
+        if (REP_STATUSES.indexOf(target as RepStatus) > from) {
+          const { error: sErr } = await supabase
+            .schema(ONBOARDING_SCHEMA)
+            .from("reps")
+            .update({ status: target })
+            .eq("id", repId);
+          if (sErr) throw new ActionError(sErr.message, 500);
+          movedTo = target;
+        }
       }
     }
 
@@ -64,11 +89,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       action: action === "complete" ? "checklist_completed" : "checklist_reopened",
       summary:
         action === "complete"
-          ? `Checked "${item.label}"${enqueued ? ` — queued ${enqueued} automation action(s)` : ""}`
+          ? `Checked "${item.label}"${enqueued ? ` — queued ${enqueued} automation action(s)` : ""}${
+              movedTo ? ` — moved to ${movedTo}` : ""
+            }`
           : `Reopened "${item.label}"`,
     });
 
-    return NextResponse.json({ ok: true, enqueued });
+    return NextResponse.json({ ok: true, enqueued, movedTo });
   } catch (e) {
     if (e instanceof ActionError) return NextResponse.json({ error: e.message }, { status: e.status });
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });

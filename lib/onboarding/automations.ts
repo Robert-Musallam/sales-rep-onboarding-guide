@@ -64,6 +64,23 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
   ],
 };
 
+/**
+ * Board stage a checklist automation moves the rep into when it is checked.
+ *
+ * The checklist owns the board, not the automations it fires: checking "Gusto"
+ * means the contract went out, which is `contract_sent`, even though the same
+ * check also creates the Microsoft user in the background. Provisioning is a
+ * stage the manager sees when the license is assigned and the Teams setup
+ * begins, not a side effect of one account being created.
+ *
+ * Applied forward-only (see REP_STATUSES order), so re-checking an item never
+ * drags an `active` or `inactive` rep backwards.
+ */
+export const STATUS_ON_COMPLETE: Record<string, string> = {
+  gusto_done: "contract_sent",
+  license_done: "provisioning",
+};
+
 /** Build outbox rows for a bundle. dedupe_key makes double-checking an item a no-op. */
 export function outboxRowsFor(automationKey: string, repId: number): Array<Record<string, unknown>> {
   const specs = AUTOMATION_BUNDLES[automationKey] ?? [];
