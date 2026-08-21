@@ -52,7 +52,13 @@ npm run worker:once           # one outbox pass, respects gates
 ## Deploy / operate
 
 - Webapp: Vercel (GitHub integration, zero config)
-- Migrations: `supabase/migrations/` (CLI: `supabase db push`)
+- Migrations: `supabase/migrations/` — apply with `npm run migrate`
+  (`npm run migrate:status` lists pending ones). Runs through the Management API
+  with the `SUPABASE_ACCESS_TOKEN` from `.env.local`, so it needs neither a
+  linked CLI nor the database password, and records each file in
+  `supabase_migrations.schema_migrations` — the table `supabase db push` reads,
+  so the two stay compatible. **Writing a migration is not applying it**: run
+  `npm run migrate` after any merge that adds one.
 - Worker: `ops/install_worker.sh` (launchd `com.rnb.onboarding-worker`)
 - Runbook + credentials checklist: **SETUP.md**
 - Portability: everything is env + migrations; new machine = repo + `.env.local`

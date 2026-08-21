@@ -19,6 +19,7 @@ export type ActionResult = { done: true; note?: string } | { skipped: true; note
 
 interface Rep {
   id: number;
+  status: string;
   first_name: string;
   last_name: string;
   personal_email: string | null;
@@ -164,6 +165,28 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     }
     return sendTemplatedSms(rep, "sms.invite", {
       info_form_link: `https://www.jotform.com/edit/${submissionId}`,
+    });
+  },
+
+  /**
+   * One nudge for a rep who never filled the info form. Enqueued by
+   * sweepInfoFormReminders() (worker/sweeps.ts) with run_after = invite + 24h,
+   * one row per rep ever (dedupe_key info_reminder:*).
+   *
+   * The status re-check here is the real guard: the row sits pending for a day,
+   * so the rep may well have submitted in the meantime — the sweep that created
+   * it cannot know that.
+   */
+  "rep.info_form_reminder": async (repId) => {
+    const rep = await loadRep(repId);
+    if (rep.status !== "invited") {
+      return { skipped: true, note: `rep is ${rep.status} — info form already in, no reminder sent` };
+    }
+    if (!rep.jotform_info_submission_id) {
+      return { skipped: true, note: "no prefilled Jotform submission — nothing to link to" };
+    }
+    return sendTemplatedSms(rep, "sms.info_form_reminder", {
+      info_form_link: `https://www.jotform.com/edit/${rep.jotform_info_submission_id}`,
     });
   },
 

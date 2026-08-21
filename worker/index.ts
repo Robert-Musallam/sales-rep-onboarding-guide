@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync, statSync } from "node:fs"
 import path from "node:path";
 import { db, ONBOARDING } from "./db";
 import { getHandler } from "./actions";
+import { sweepInfoFormReminders } from "./sweeps";
 import { alert } from "./alert";
 
 /**
@@ -39,6 +40,13 @@ async function pass(): Promise<void> {
   if (process.env.RNB_GLOBAL_KILL_SWITCH === "1") {
     console.log("kill switch on — leaving queue untouched");
     return;
+  }
+  // Time-based enqueues run first so anything they schedule for "now" is picked
+  // up by this same pass. A sweep failure must never stall the queue.
+  try {
+    await sweepInfoFormReminders();
+  } catch (e) {
+    console.error("info-form reminder sweep failed:", e instanceof Error ? e.message : String(e));
   }
   const { data: rows, error } = await db()
     .schema(ONBOARDING)
