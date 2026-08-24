@@ -2,6 +2,7 @@ import { db, ONBOARDING, getSetting, logActivity } from "./db";
 import { gate } from "./env";
 import { ENV } from "./env";
 import { renderTemplate } from "./templates";
+import { stateFromZip } from "./usState";
 import * as graph from "./connectors/graph";
 import * as dialpad from "./connectors/dialpad";
 import * as hcp from "./connectors/hcp";
@@ -17,7 +18,7 @@ import * as jotform from "./connectors/jotform";
  */
 export type ActionResult = { done: true; note?: string } | { skipped: true; note: string };
 
-interface Rep {
+export interface Rep {
   id: number;
   status: string;
   first_name: string;
@@ -25,10 +26,14 @@ interface Rep {
   personal_email: string | null;
   phone_e164: string | null;
   phone_os: string | null;
+  home_address: string | null;
+  zip_code: string | null;
+  info: Record<string, unknown>;
   manager_name: string | null;
   territory_id: number | null;
   rnb_email: string | null;
   m365_user_id: string | null;
+  m365_temp_password: string | null;
   teams_chat_id: string | null;
   phone_room_chat_id: string | null;
   hcp_employee_id: string | null;
@@ -54,6 +59,44 @@ async function updateRep(repId: number, patch: Record<string, unknown>) {
   if (error) throw new Error(`updateRep: ${error.message}`);
 }
 
+/**
+ * Street and city for the M365 contact card.
+ *
+ * The rep-info form keeps them apart (`q34_homeAddress` / `q40_city`) but the
+ * webhook stores them joined in `home_address` ("1647 Bay St SE, Saint
+ * Petersburg"). Prefer the raw form fields; fall back to splitting on the last
+ * comma for rows typed in by hand.
+ */
+function homeParts(rep: Rep): { street: string | null; city: string | null } {
+  const info = rep.info ?? {};
+  const rawStreet = typeof info.q34_homeAddress === "string" ? info.q34_homeAddress : null;
+  const rawCity = typeof info.q40_city === "string" ? info.q40_city : null;
+  if (rawStreet || rawCity) return { street: rawStreet, city: rawCity };
+
+  const joined = (rep.home_address ?? "").trim();
+  if (!joined) return { street: null, city: null };
+  const i = joined.lastIndexOf(",");
+  if (i === -1) return { street: joined, city: null };
+  return { street: joined.slice(0, i).trim() || null, city: joined.slice(i + 1).trim() || null };
+}
+
+/** Everything the admin center shows under "Manage contact information". */
+export async function contactInfo(rep: Rep): Promise<graph.ContactInfo> {
+  const { street, city } = homeParts(rep);
+  return {
+    jobTitle: (await getSetting<string>("m365_job_title")) ?? "Design Consultant",
+    companyName: (await getSetting<string>("m365_company_name")) ?? "Rock N Block",
+    officeLocation: rep.territory?.name ?? null,
+    streetAddress: street,
+    city,
+    state: stateFromZip(rep.zip_code),
+    postalCode: rep.zip_code,
+    country: "United States",
+    mobilePhone: rep.phone_e164,
+    otherMails: rep.personal_email ? [rep.personal_email] : [],
+  };
+}
+
 function repVars(rep: Rep): Record<string, string | null> {
   return {
     first_name: rep.first_name,
@@ -62,6 +105,9 @@ function repVars(rep: Rep): Record<string, string | null> {
     manager_name: rep.manager_name,
     rnb_email: rep.rnb_email,
     phone: rep.phone_e164,
+    // The welcome email prints this. Falls back to the constant for reps
+    // provisioned before it was stored, so the email is never blank.
+    temp_password: rep.m365_temp_password ?? graph.TEMP_PASSWORD,
     rep_url: `${ENV.appBaseUrl()}/reps?open=${rep.id}`,
   };
 }
@@ -278,6 +324,7 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
       firstName: rep.first_name,
       lastName: rep.last_name,
       domain,
+      contact: await contactInfo(rep),
     });
     // Deliberately does NOT touch status: the Gusto check that fired this puts
     // the rep in `contract_sent` (STATUS_ON_COMPLETE in lib/onboarding/

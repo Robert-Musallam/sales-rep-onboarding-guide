@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { ENV } from "../env";
 import { db, ONBOARDING } from "../db";
 import { decryptToken, encryptToken } from "../../lib/tokenCrypto";
@@ -89,15 +88,58 @@ async function must(res: Response, what: string): Promise<Record<string, unknown
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
+/**
+ * The temp password every new rep gets. Deliberately STATIC and shared: the
+ * welcome email hands it to the rep in plain text and Microsoft forces a change
+ * at first sign-in (`forceChangePasswordNextSignIn` below), so it never
+ * survives past that login.
+ *
+ * It used to be random per rep, which silently broke onboarding — the welcome
+ * email had "Temporary_password" hardcoded, so every rep was told a password
+ * that had never been set. Keep this value and the email in sync: the email
+ * renders it from `{{temp_password}}`, so it now follows this constant.
+ */
+export const TEMP_PASSWORD = "Temporary_password1";
+
 export function generateTempPassword(): string {
-  // 16 chars, mixed classes — replaces the Make scenario's static "Temporary_password".
-  return `Rnb-${randomBytes(6).toString("base64url")}-${Math.floor(Math.random() * 90 + 10)}!`;
+  return TEMP_PASSWORD;
+}
+
+/**
+ * Contact-card fields — everything the M365 admin center shows behind "Manage
+ * contact information". All optional: blank/absent values are dropped so we
+ * never write an empty string over a field an admin filled in by hand.
+ */
+export interface ContactInfo {
+  jobTitle?: string | null;
+  companyName?: string | null;
+  officeLocation?: string | null;
+  streetAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  mobilePhone?: string | null;
+  otherMails?: string[];
+}
+
+function contactPayload(c: ContactInfo | undefined): Record<string, unknown> {
+  if (!c) return {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(c)) {
+    if (k === "otherMails") continue;
+    if (typeof v === "string" && v.trim()) out[k] = v.trim();
+  }
+  const mails = (c.otherMails ?? []).filter((m) => m && m.includes("@"));
+  if (mails.length) out.otherMails = mails;
+  return out;
 }
 
 export async function createUser(opts: {
   firstName: string;
   lastName: string;
   domain: string;
+  contact?: ContactInfo;
 }): Promise<{ userId: string; upn: string; tempPassword: string }> {
   const token = await getAppToken();
   const base = `${opts.firstName[0]}${opts.lastName}`.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -116,12 +158,16 @@ export async function createUser(opts: {
     method: "POST",
     body: JSON.stringify({
       accountEnabled: true,
-      displayName: `${opts.firstName[0]}${opts.lastName}`,
+      // Full name. It used to be initial+lastname ("CZurek") only because the
+      // Make scenario reused the mail nickname for both. The UPN below keeps
+      // that rule — mailboxes stay czurek@ — but the directory shows a name.
+      displayName: `${opts.firstName} ${opts.lastName}`,
       givenName: opts.firstName,
       surname: opts.lastName,
       mailNickname,
       userPrincipalName: upn,
       passwordProfile: { password: tempPassword, forceChangePasswordNextSignIn: true },
+      ...contactPayload(opts.contact),
     }),
   });
   if (!res.ok) {
