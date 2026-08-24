@@ -182,6 +182,40 @@ export async function createUser(opts: {
   return { userId: j.id, upn, tempPassword };
 }
 
+const PROFILE_SELECT =
+  "displayName,jobTitle,companyName,officeLocation,streetAddress,city,state,postalCode,country,mobilePhone,otherMails";
+
+/** Read back the fields the admin center shows — used to preview a backfill. */
+export async function getUserProfile(userId: string): Promise<Record<string, unknown>> {
+  const token = await getAppToken();
+  return must(
+    await graphFetch(token, `/users/${encodeURIComponent(userId)}?$select=${PROFILE_SELECT}`),
+    `graph getUserProfile ${userId}`,
+  );
+}
+
+/**
+ * PATCH an existing directory record — display name and/or the contact card.
+ * Same field rules as createUser: blank values are dropped, never written over
+ * something an admin filled in by hand.
+ */
+export async function updateUser(
+  userId: string,
+  patch: { displayName?: string | null; contact?: ContactInfo },
+): Promise<void> {
+  const body: Record<string, unknown> = { ...contactPayload(patch.contact) };
+  if (patch.displayName?.trim()) body.displayName = patch.displayName.trim();
+  if (!Object.keys(body).length) return;
+  const token = await getAppToken();
+  await must(
+    await graphFetch(token, `/users/${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+    `graph updateUser ${userId}`,
+  );
+}
+
 export async function findUserByUpn(upn: string): Promise<{ id: string } | null> {
   const token = await getAppToken();
   const res = await graphFetch(token, `/users/${encodeURIComponent(upn)}?$select=id`);
