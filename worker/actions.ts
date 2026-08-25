@@ -108,21 +108,27 @@ async function completeChecklistItem(
       enqueued = rows.length;
     }
     const target = STATUS_ON_COMPLETE[item.automation_key as string];
-    if (target) {
-      const { data: rep } = await db()
-        .schema(ONBOARDING)
-        .from("reps")
-        .select("status")
-        .eq("id", repId)
-        .maybeSingle();
-      const from = REP_STATUSES.indexOf((rep?.status ?? "invited") as RepStatus);
-      if (REP_STATUSES.indexOf(target as RepStatus) > from) {
-        await updateRep(repId, { status: target });
-        movedTo = target;
-      }
-    }
+    if (target) movedTo = await advanceStatus(repId, target);
   }
   return { alreadyDone: false, enqueued, movedTo };
+}
+
+/**
+ * Move a rep to `target` only if that is further along than where they are.
+ * Returns the new status, or null when the rep was already at or past it — a
+ * late signal can never drag an `active` rep back to an earlier column.
+ */
+async function advanceStatus(repId: number, target: string): Promise<string | null> {
+  const { data: rep } = await db()
+    .schema(ONBOARDING)
+    .from("reps")
+    .select("status")
+    .eq("id", repId)
+    .maybeSingle();
+  const from = REP_STATUSES.indexOf((rep?.status ?? "invited") as RepStatus);
+  if (REP_STATUSES.indexOf(target as RepStatus) <= from) return null;
+  await updateRep(repId, { status: target });
+  return target;
 }
 
 /** Trim, drop blanks, and collapse case-insensitive duplicates. */
@@ -347,26 +353,36 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
 
   /**
    * Gusto contract signed (enqueued by the mailbox watcher, see watchers.ts).
-   * Checks the Gusto item and texts ops.
+   * Checks the Gusto item, moves the rep to Contract Signed, and texts ops.
+   *
+   * This is the only thing that ever puts a rep in `contract_signed` — a stage
+   * that sat unused on the board because nothing knew when a contract came
+   * back. Checking the Gusto item by hand means "contract sent", which is a
+   * different and earlier fact.
    *
    * In practice the item is usually already checked — the manager ticks it when
    * they send the contract, days before the rep signs — so the auto-check is a
-   * no-op and the text is what tells ops the contract actually came back. The
-   * check earns its place for the reps whose box nobody ever ticks: it fires the
-   * same bundle a manual click would, so the M365 user still gets created.
+   * no-op and the stage move plus the text are what carry the news. The check
+   * earns its place for the reps whose box nobody ever ticks: it fires the same
+   * bundle a manual click would, so the M365 user still gets created.
    */
   "rep.gusto_signed": async (repId, payload) => {
     const rep = await loadRep(repId);
     const result = await completeChecklistItem(repId, "gusto");
-    const checklistNote = result.alreadyDone
+    // After the item, so the checklist's own contract_sent move never overrides
+    // the later, truer one. Forward-only: a rep already provisioning stays put.
+    const signedMove = await advanceStatus(repId, "contract_signed");
+    const checkPart = result.alreadyDone
       ? "Gusto checklist item was already checked."
-      : `Gusto checklist item auto-checked${result.enqueued ? ` — ${result.enqueued} action(s) queued` : ""}${
-          result.movedTo ? `, moved to ${result.movedTo}` : ""
-        }.`;
+      : `Gusto checklist item auto-checked${result.enqueued ? ` — ${result.enqueued} action(s) queued` : ""}.`;
+    const stagePart = signedMove
+      ? " Moved to Contract Signed."
+      : ` Stage unchanged (already ${rep.status}).`;
+    const checklistNote = `${checkPart}${stagePart}`;
     await logActivity(repId, "gusto_contract_signed", `Contract signed in Gusto — ${checklistNote}`, {
       ...payload,
       enqueued: result.enqueued,
-      moved_to: result.movedTo,
+      moved_to: signedMove ?? result.movedTo,
     });
 
     const copyTo =
