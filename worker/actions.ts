@@ -1,4 +1,4 @@
-import { db, ONBOARDING, getSetting, logActivity } from "./db";
+import { db, ONBOARDING, SHARED, getSetting, logActivity } from "./db";
 import { gate } from "./env";
 import { ENV } from "./env";
 import { renderTemplate } from "./templates";
@@ -57,6 +57,49 @@ async function loadRep(repId: number): Promise<Rep> {
 async function updateRep(repId: number, patch: Record<string, unknown>) {
   const { error } = await db().schema(ONBOARDING).from("reps").update(patch).eq("id", repId);
   if (error) throw new Error(`updateRep: ${error.message}`);
+}
+
+/** Trim, drop blanks, and collapse case-insensitive duplicates. */
+function dedupeEmails(list: (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of list) {
+    const addr = (raw ?? "").trim();
+    if (!addr || seen.has(addr.toLowerCase())) continue;
+    seen.add(addr.toLowerCase());
+    out.push(addr);
+  }
+  return out;
+}
+
+/**
+ * The hiring manager's email, so the welcome email copies the manager of the
+ * rep's own city. Managers live in two places: `people` rows carrying the
+ * "manager" role (config only, no login — how a manager without an app account
+ * gets reached) and `shared.profiles` for the ones who do log in. People wins;
+ * profiles is the fallback. Null when the name matches neither — the send goes
+ * ahead without the manager rather than failing over a config gap.
+ */
+export async function managerEmail(rep: Rep): Promise<string | null> {
+  const name = (rep.manager_name ?? "").trim();
+  if (!name) return null;
+  const { data: people } = await db()
+    .schema(ONBOARDING)
+    .from("people")
+    .select("email")
+    .eq("active", true)
+    .contains("roles", ["manager"])
+    .ilike("full_name", name)
+    .limit(1);
+  const fromPeople = people?.[0]?.email as string | undefined;
+  if (fromPeople) return fromPeople;
+  const { data: profiles } = await db()
+    .schema(SHARED)
+    .from("profiles")
+    .select("email")
+    .ilike("full_name", name)
+    .limit(1);
+  return (profiles?.[0]?.email as string | undefined) ?? null;
 }
 
 /**
@@ -448,7 +491,9 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     if (!sender) throw new Error("app_settings.welcome_email_sender is empty — set it in Settings (SETUP.md §2)");
     const verdict = gate("email", rep.rnb_email);
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${rep.rnb_email}` };
-    const bcc = (await getSetting<string[]>("welcome_email_bcc")) ?? [];
+    // Standing list (Robert, Jose, Albert, Fatima) + the rep's own city manager.
+    const manager = await managerEmail(rep);
+    const bcc = dedupeEmails([...((await getSetting<string[]>("welcome_email_bcc")) ?? []), manager]);
     const { subject, body } = await renderTemplate("email.welcome", repVars(rep));
     await graph.sendMail({
       fromUpn: sender,
@@ -458,7 +503,14 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
       subject,
       html: body,
     });
-    await logActivity(repId, "welcome_email_sent", `Welcome email → ${rep.rnb_email} (cc ${rep.personal_email ?? "—"})`);
+    const managerNote = manager
+      ? `manager ${manager}`
+      : `manager ${rep.manager_name ?? "—"} has no email on file`;
+    await logActivity(
+      repId,
+      "welcome_email_sent",
+      `Welcome email → ${rep.rnb_email} (cc ${rep.personal_email ?? "—"}; bcc ${bcc.length}: ${managerNote})`,
+    );
     return { done: true };
   },
 
