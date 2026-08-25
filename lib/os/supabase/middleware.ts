@@ -5,9 +5,12 @@ import { NextResponse, type NextRequest } from "next/server";
  * Refreshes the Supabase auth session on every request and redirects
  * unauthenticated users to /login.
  *
- * Public paths: /login, /auth, /api (routes 401 themselves), and /my — the
- * rep-facing onboarding hub, which authenticates by per-rep secret token in the
- * URL instead of a Supabase session (reps have no login).
+ * Public paths: /login, /auth, /api (routes 401 themselves), and the two
+ * token-authenticated surfaces whose secret lives in the URL instead of a
+ * Supabase session — /my/<token> (the rep hub; reps have no login) and
+ * /intake/<token> (the per-city intake form; the managers who file reps have no
+ * login either). Bare /intake stays behind the session: it is the signed-in
+ * version of the same form, and only the tokenized path is public.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -42,6 +45,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
     path.startsWith("/my") || // rep hub — token-authenticated, no Supabase session
+    /^\/intake\/[^/]+$/.test(path) || // per-city intake link — token in the URL, not /intake itself
     path.startsWith("/guide") || // static manager's guide (public/guide/)
     path.startsWith("/api") || // API routes enforce auth themselves (return 401, not redirect)
     path.startsWith("/_next") ||

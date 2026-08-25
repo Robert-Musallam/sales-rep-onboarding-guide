@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/os/supabase/client";
 import { ONBOARDING_SCHEMA } from "@/lib/os/schemas";
 import { Badge } from "@/components/os/Badge";
+import { IntakeLinksPanel } from "./IntakeLinksPanel";
 
 /**
  * Settings — the config surface for everything the automations read:
@@ -11,11 +12,12 @@ import { Badge } from "@/components/os/Badge";
  * template, and connection/queue health. Config CRUD writes go straight
  * through the RLS-scoped client (side effects only ever flow via the outbox).
  */
-type Tab = "territories" | "people" | "templates" | "checklist" | "app" | "health";
+type Tab = "territories" | "people" | "links" | "templates" | "checklist" | "app" | "health";
 
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: "territories", label: "Territories" },
   { key: "people", label: "People" },
+  { key: "links", label: "Intake Links" },
   { key: "templates", label: "Messages" },
   { key: "checklist", label: "Checklist" },
   { key: "app", label: "App Settings" },
@@ -60,6 +62,7 @@ export function SettingsView() {
         newRow={{ full_name: "", roles: [], territories: [], active: true }}
         help='Roles: "phone_room_roster", "welcome_email_bcc", "business_card_contact", "admin_notify"'
       />}
+      {tab === "links" && <IntakeLinksPanel />}
       {tab === "templates" && <TemplatesEditor />}
       {tab === "checklist" && <TableEditor
         table="checklist_templates"
