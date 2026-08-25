@@ -494,7 +494,14 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     // Standing list (Robert, Jose, Albert, Fatima) + the rep's own city manager.
     const manager = await managerEmail(rep);
     const bcc = dedupeEmails([...((await getSetting<string[]>("welcome_email_bcc")) ?? []), manager]);
-    const { subject, body } = await renderTemplate("email.welcome", repVars(rep));
+    // The closing block tells the rep to write here, not to the sender — kept in
+    // settings so the contact can change without editing the template.
+    const supportEmail =
+      (await getSetting<string>("support_contact_email")) ?? "rmusallam@rocknblocklandscape.com";
+    const { subject, body } = await renderTemplate("email.welcome", {
+      ...repVars(rep),
+      support_email: supportEmail,
+    });
     await graph.sendMail({
       fromUpn: sender,
       to: [rep.rnb_email],
