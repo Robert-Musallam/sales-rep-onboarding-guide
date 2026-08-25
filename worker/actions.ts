@@ -1,4 +1,6 @@
 import { db, ONBOARDING, SHARED, getSetting, logActivity } from "./db";
+import { outboxRowsFor, STATUS_ON_COMPLETE } from "../lib/onboarding/automations";
+import { REP_STATUSES, type RepStatus } from "../modules/reps/types";
 import { gate } from "./env";
 import { ENV } from "./env";
 import { renderTemplate } from "./templates";
@@ -57,6 +59,70 @@ async function loadRep(repId: number): Promise<Rep> {
 async function updateRep(repId: number, patch: Record<string, unknown>) {
   const { error } = await db().schema(ONBOARDING).from("reps").update(patch).eq("id", repId);
   if (error) throw new Error(`updateRep: ${error.message}`);
+}
+
+/**
+ * Check a checklist item the way the drawer does — same three effects, so an
+ * item the system checks is indistinguishable from one a manager clicked:
+ * mark it done, enqueue its automation bundle (dedupe_key makes a second check
+ * a no-op), and move the card forward. Never backwards: a rep already past the
+ * target status keeps the status they have.
+ *
+ * Mirrors app/api/reps/[id]/checklist/[itemId]/route.ts. That route runs as the
+ * signed-in manager and this runs as the system, which is the whole reason the
+ * logic is here twice rather than shared — the route's auth, RLS client and
+ * activity actor have no meaning in the worker.
+ */
+async function completeChecklistItem(
+  repId: number,
+  templateKey: string,
+): Promise<{ alreadyDone: boolean; enqueued: number; movedTo: string | null }> {
+  const { data: item, error } = await db()
+    .schema(ONBOARDING)
+    .from("checklist_items")
+    .select("id, label, automation_key, status")
+    .eq("rep_id", repId)
+    .eq("template_key", templateKey)
+    .maybeSingle();
+  if (error) throw new Error(`checklist_items: ${error.message}`);
+  if (!item) throw new Error(`rep ${repId} has no "${templateKey}" checklist item`);
+  if (item.status === "done") return { alreadyDone: true, enqueued: 0, movedTo: null };
+
+  const { error: uErr } = await db()
+    .schema(ONBOARDING)
+    .from("checklist_items")
+    .update({ status: "done", completed_by: null, completed_at: new Date().toISOString() })
+    .eq("id", item.id);
+  if (uErr) throw new Error(`checklist update: ${uErr.message}`);
+
+  let enqueued = 0;
+  let movedTo: string | null = null;
+  if (item.automation_key) {
+    const rows = outboxRowsFor(item.automation_key as string, repId);
+    if (rows.length) {
+      const { error: oErr } = await db()
+        .schema(ONBOARDING)
+        .from("outbox")
+        .upsert(rows, { onConflict: "dedupe_key", ignoreDuplicates: true });
+      if (oErr) throw new Error(`outbox: ${oErr.message}`);
+      enqueued = rows.length;
+    }
+    const target = STATUS_ON_COMPLETE[item.automation_key as string];
+    if (target) {
+      const { data: rep } = await db()
+        .schema(ONBOARDING)
+        .from("reps")
+        .select("status")
+        .eq("id", repId)
+        .maybeSingle();
+      const from = REP_STATUSES.indexOf((rep?.status ?? "invited") as RepStatus);
+      if (REP_STATUSES.indexOf(target as RepStatus) > from) {
+        await updateRep(repId, { status: target });
+        movedTo = target;
+      }
+    }
+  }
+  return { alreadyDone: false, enqueued, movedTo };
 }
 
 /** Trim, drop blanks, and collapse case-insensitive duplicates. */
@@ -277,6 +343,51 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     return sendTemplatedSms(rep, "sms.info_form_reminder", {
       info_form_link: `https://www.jotform.com/edit/${rep.jotform_info_submission_id}`,
     });
+  },
+
+  /**
+   * Gusto contract signed (enqueued by the mailbox watcher, see watchers.ts).
+   * Checks the Gusto item and texts ops.
+   *
+   * In practice the item is usually already checked — the manager ticks it when
+   * they send the contract, days before the rep signs — so the auto-check is a
+   * no-op and the text is what tells ops the contract actually came back. The
+   * check earns its place for the reps whose box nobody ever ticks: it fires the
+   * same bundle a manual click would, so the M365 user still gets created.
+   */
+  "rep.gusto_signed": async (repId, payload) => {
+    const rep = await loadRep(repId);
+    const result = await completeChecklistItem(repId, "gusto");
+    const checklistNote = result.alreadyDone
+      ? "Gusto checklist item was already checked."
+      : `Gusto checklist item auto-checked${result.enqueued ? ` — ${result.enqueued} action(s) queued` : ""}${
+          result.movedTo ? `, moved to ${result.movedTo}` : ""
+        }.`;
+    await logActivity(repId, "gusto_contract_signed", `Contract signed in Gusto — ${checklistNote}`, {
+      ...payload,
+      enqueued: result.enqueued,
+      moved_to: result.movedTo,
+    });
+
+    const copyTo =
+      (await getSetting<string>("sms_copy_to")) || (await getSetting<string>("gusto_sms_copy_to")) || "";
+    if (!copyTo) return { done: true, note: `${checklistNote} No ops number configured — no text sent.` };
+    const { body } = await renderTemplate("sms.gusto_signed_ops", {
+      ...repVars(rep),
+      checklist_note: checklistNote,
+    });
+    const verdict = gate("sms", copyTo);
+    if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would text ops ${copyTo}: ${body}` };
+    const from = (await getSetting<string>("dialpad_from_number")) ?? "";
+    const dp = await dialpad.sendSms({ from, to: copyTo, text: body });
+    await logActivity(repId, "sms_sent", `Texted ops ${copyTo} (sms.gusto_signed_ops): "${body}"`, {
+      template_key: "sms.gusto_signed_ops",
+      to: copyTo,
+      from,
+      body,
+      dialpad: dp,
+    });
+    return { done: true, note: `${checklistNote} → ops ${copyTo} · dialpad id ${dp.id ?? "?"}` };
   },
 
   /**

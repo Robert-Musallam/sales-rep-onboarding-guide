@@ -254,6 +254,44 @@ export async function sendMail(opts: {
   );
 }
 
+export interface MailMessage {
+  id: string;
+  internetMessageId: string;
+  subject: string;
+  receivedDateTime: string;
+  from: string;
+}
+
+/**
+ * Inbox messages received at or after `since`, oldest first.
+ *
+ * The sender cut happens in the caller, not in `$filter`: Graph rejects a
+ * filter that combines `from/emailAddress/address` with a receivedDateTime
+ * range ("InefficientFilter"), and the mailbox being watched sees ~20 messages
+ * a day, so filtering in memory costs nothing.
+ */
+export async function listInboxSince(mailbox: string, since: string, top = 100): Promise<MailMessage[]> {
+  const token = await getAppToken();
+  const qs = new URLSearchParams({
+    $filter: `receivedDateTime ge ${since}`,
+    $orderby: "receivedDateTime asc",
+    $top: String(top),
+    $select: "id,internetMessageId,subject,receivedDateTime,from",
+  });
+  const j = await must(
+    await graphFetch(token, `/users/${encodeURIComponent(mailbox)}/mailFolders/Inbox/messages?${qs}`),
+    "graph listInbox",
+  );
+  const rows = (j.value ?? []) as Array<Record<string, unknown>>;
+  return rows.map((m) => ({
+    id: m.id as string,
+    internetMessageId: (m.internetMessageId as string) ?? (m.id as string),
+    subject: (m.subject as string) ?? "",
+    receivedDateTime: m.receivedDateTime as string,
+    from: (((m.from as Record<string, Record<string, string>>)?.emailAddress?.address ?? "") as string).toLowerCase(),
+  }));
+}
+
 // ── Chats ────────────────────────────────────────────────────────────────────
 
 const member = (idOrUpn: string) => ({

@@ -3,6 +3,7 @@ import path from "node:path";
 import { db, ONBOARDING } from "./db";
 import { getHandler } from "./actions";
 import { sweepInfoFormReminders } from "./sweeps";
+import { watchGustoSignatures } from "./watchers";
 import { alert } from "./alert";
 
 /**
@@ -47,6 +48,11 @@ async function pass(): Promise<void> {
     await sweepInfoFormReminders();
   } catch (e) {
     console.error("info-form reminder sweep failed:", e instanceof Error ? e.message : String(e));
+  }
+  try {
+    await watchGustoSignatures();
+  } catch (e) {
+    console.error("gusto signature watch failed:", e instanceof Error ? e.message : String(e));
   }
   const { data: rows, error } = await db()
     .schema(ONBOARDING)
