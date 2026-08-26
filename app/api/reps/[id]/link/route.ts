@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ActionError, requireUser } from "@/lib/os/entity";
 import { ONBOARDING_SCHEMA } from "@/lib/os/schemas";
+import { appBaseUrl } from "@/lib/os/baseUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       token = created.token as string;
     }
 
-    const base = process.env.APP_BASE_URL ?? "";
+    const base = appBaseUrl();
     return NextResponse.json({ ok: true, url: `${base}/my/${token}` });
   } catch (e) {
     if (e instanceof ActionError) return NextResponse.json({ error: e.message }, { status: e.status });

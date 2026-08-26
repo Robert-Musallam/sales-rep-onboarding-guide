@@ -22,13 +22,18 @@ interface LinkRow {
  * deactivates the old row and issues a new one — anyone still holding the old
  * URL is out immediately, and the reps it filed keep pointing at it.
  */
-export function IntakeLinksPanel() {
+export function IntakeLinksPanel({ baseUrl }: { baseUrl: string }) {
   const supabase = createClient();
   const [rows, setRows] = useState<LinkRow[]>([]);
   const [busy, setBusy] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
-  const base = typeof window === "undefined" ? "" : window.location.origin;
+  // Canonical host from the server (APP_BASE_URL). Never window.location: opening
+  // the app from a Vercel deployment URL would bake that SSO-protected host into
+  // every link handed out.
+  const base = baseUrl || (typeof window === "undefined" ? "" : window.location.origin);
+  const onCanonicalHost =
+    !baseUrl || typeof window === "undefined" || window.location.origin === baseUrl;
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -98,6 +103,13 @@ export function IntakeLinksPanel() {
         anyone holding it can file reps in that city, and every filing texts the phone number typed into the
         form. Rotate a link the moment it leaks or someone leaves.
       </p>
+
+      {!onCanonicalHost && (
+        <div className="text-[12px] text-navy bg-amber/10 border border-amber/30 rounded-lg px-3 py-2">
+          You are viewing this page on <code>{window.location.host}</code>, which sits behind Vercel&apos;s login.
+          The links below already point at <code>{base}</code>, the address managers can actually open.
+        </div>
+      )}
 
       {err && <div className="text-[12px] text-red bg-red/10 border border-red/20 rounded-lg px-3 py-2">{err}</div>}
 

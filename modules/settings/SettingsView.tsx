@@ -24,7 +24,7 @@ const TABS: Array<{ key: Tab; label: string }> = [
   { key: "health", label: "Connections & Health" },
 ];
 
-export function SettingsView() {
+export function SettingsView({ baseUrl }: { baseUrl: string }) {
   const [tab, setTab] = useState<Tab>("territories");
   return (
     <div className="space-y-4">
@@ -62,7 +62,7 @@ export function SettingsView() {
         newRow={{ full_name: "", roles: [], territories: [], active: true }}
         help='Roles: "phone_room_roster", "welcome_email_bcc", "business_card_contact", "admin_notify"'
       />}
-      {tab === "links" && <IntakeLinksPanel />}
+      {tab === "links" && <IntakeLinksPanel baseUrl={baseUrl} />}
       {tab === "templates" && <TemplatesEditor />}
       {tab === "checklist" && <TableEditor
         table="checklist_templates"
