@@ -618,9 +618,15 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     if (!sender) throw new Error("app_settings.welcome_email_sender is empty — set it in Settings (SETUP.md §2)");
     const verdict = gate("email", rep.rnb_email);
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${rep.rnb_email}` };
-    // Standing list (Robert, Jose, Albert, Fatima) + the rep's own city manager.
+    // Standing list (Robert, Jose, Albert, Fatima, Diego) + the rep's own city
+    // manager, all in cc next to the rep's personal address — the list is
+    // visible to the rep by design as of 20260902150000.
     const manager = await managerEmail(rep);
-    const bcc = dedupeEmails([...((await getSetting<string[]>("welcome_email_bcc")) ?? []), manager]);
+    const cc = dedupeEmails([
+      rep.personal_email,
+      ...((await getSetting<string[]>("welcome_email_cc")) ?? []),
+      manager,
+    ]);
     // The closing block tells the rep to write here, not to the sender — kept in
     // settings so the contact can change without editing the template.
     const supportEmail =
@@ -632,8 +638,7 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     await graph.sendMail({
       fromUpn: sender,
       to: [rep.rnb_email],
-      cc: rep.personal_email ? [rep.personal_email] : [],
-      bcc,
+      cc,
       subject,
       html: body,
     });
@@ -643,7 +648,7 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     await logActivity(
       repId,
       "welcome_email_sent",
-      `Welcome email → ${rep.rnb_email} (cc ${rep.personal_email ?? "—"}; bcc ${bcc.length}: ${managerNote})`,
+      `Welcome email → ${rep.rnb_email} (cc ${cc.length}: ${cc.join(", ")}; ${managerNote})`,
     );
     return { done: true };
   },

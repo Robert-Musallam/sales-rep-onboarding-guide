@@ -60,7 +60,7 @@ export function SettingsView({ baseUrl }: { baseUrl: string }) {
           { key: "active", label: "Active", bool: true },
         ]}
         newRow={{ full_name: "", roles: [], territories: [], active: true }}
-        help='Roles: "phone_room_roster", "welcome_email_bcc", "business_card_contact", "admin_notify"'
+        help='Roles: "phone_room_roster", "welcome_email_cc", "business_card_contact", "admin_notify"'
       />}
       {tab === "links" && <IntakeLinksPanel baseUrl={baseUrl} />}
       {tab === "templates" && <TemplatesEditor />}
