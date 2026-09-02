@@ -61,6 +61,9 @@ async function pass(): Promise<void> {
     .eq("state", "pending")
     .lte("run_after", new Date().toISOString())
     .order("run_after", { ascending: true })
+    // Tiebreak by insertion order so a bundle's rows that share a run_after drain
+    // in the order AUTOMATION_BUNDLES declares them, instead of arbitrarily.
+    .order("id", { ascending: true })
     .limit(BATCH);
   if (error) throw new Error(`outbox fetch: ${error.message}`);
   if (!rows?.length) return;

@@ -152,6 +152,21 @@ function dedupeEmails(list: (string | null | undefined)[]): string[] {
  * profiles is the fallback. Null when the name matches neither — the send goes
  * ahead without the manager rather than failing over a config gap.
  */
+/**
+ * Membership in the company-wide announcements chat, made certain.
+ *
+ * Idempotent — graph.addChatMember treats Graph's "already a member" as success
+ * — so it is safe to call on every path that needs the guarantee rather than
+ * trusting an earlier action to have landed.
+ */
+async function ensureCompanyChatMember(rep: Rep): Promise<string> {
+  if (!rep.m365_user_id) throw new Error("rep has no m365_user_id yet");
+  const chatId = (await getSetting<string>("company_wide_chat_id")) ?? "";
+  if (!chatId) throw new Error("app_settings.company_wide_chat_id is empty");
+  await graph.addChatMember(chatId, rep.m365_user_id);
+  return chatId;
+}
+
 export async function managerEmail(rep: Rep): Promise<string | null> {
   const name = (rep.manager_name ?? "").trim();
   if (!name) return null;
@@ -597,13 +612,29 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     return { done: true };
   },
 
+  /** Add the rep to the company-wide announcements chat.
+   *  Must land before teams.company_announcement: the announcement is posted in
+   *  that chat, so a rep who is not a member yet never sees their own welcome. */
+  "teams.join_company_chat": async (repId) => {
+    const rep = await loadRep(repId);
+    const verdict = gate("teams");
+    if (!verdict.allowed) {
+      return { skipped: true, note: `${verdict.reason} — would add rep to the company-wide chat` };
+    }
+    await ensureCompanyChatMember(rep);
+    await logActivity(repId, "company_chat_joined", "Added to the company-wide announcements chat");
+    return { done: true };
+  },
+
   /** Company-wide welcome announcement. */
   "teams.company_announcement": async (repId) => {
     const rep = await loadRep(repId);
-    const chatId = (await getSetting<string>("company_wide_chat_id")) ?? "";
-    if (!chatId) throw new Error("app_settings.company_wide_chat_id is empty");
     const verdict = gate("teams");
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would post company-wide welcome` };
+    // Never announce into a room the rep is not in. teams.join_company_chat has
+    // normally done this already; repeating it here costs one idempotent call and
+    // makes the guarantee independent of that action having succeeded first.
+    const chatId = await ensureCompanyChatMember(rep);
     const { body } = await renderTemplate("teams.company_announcement", repVars(rep));
     await graph.sendChatMessage(chatId, body);
     await logActivity(repId, "company_announcement", "Posted company-wide welcome");

@@ -47,7 +47,12 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
   ],
 
   // Checklist: "Welcome message" checked — the public-facing welcome.
+  // The rep joins the company-wide chat FIRST: the announcement is posted in
+  // that chat, so a rep who is not a member yet never sees their own welcome.
+  // No stagger needed — the worker now drains same-run_after rows in declared
+  // order, and teams.company_announcement re-asserts the membership anyway.
   welcome_done: [
+    { actionType: "teams.join_company_chat" },
     { actionType: "teams.company_announcement" },
     { actionType: "email.welcome" },
   ],

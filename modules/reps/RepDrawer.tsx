@@ -24,6 +24,7 @@ const ACTIVITY_ICONS: Record<string, string> = {
   teams_dm_sent: "👋",
   phone_room_created: "📣",
   territory_chats_joined: "🌐",
+  company_chat_joined: "🏢",
   company_announcement: "🎉",
   welcome_email_sent: "✉️",
   hcp_user_created: "🛠️",
