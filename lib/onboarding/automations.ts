@@ -78,12 +78,18 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
  * stage the manager sees when the license is assigned and the Teams setup
  * begins, not a side effect of one account being created.
  *
+ * `active` means the rep has been welcomed — announced company-wide and sent
+ * their welcome email — not that every checklist item is done. The items after
+ * it (HCP, GreenSky, business cards, training) keep working on an active rep;
+ * they are follow-through, not gates on the rep being real.
+ *
  * Applied forward-only (see REP_STATUSES order), so re-checking an item never
  * drags an `active` or `inactive` rep backwards.
  */
 export const STATUS_ON_COMPLETE: Record<string, string> = {
   gusto_done: "contract_sent",
   license_done: "provisioning",
+  welcome_done: "active",
 };
 
 /** Build outbox rows for a bundle. dedupe_key makes double-checking an item a no-op. */
