@@ -649,6 +649,19 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     if (!sender) throw new Error("app_settings.welcome_email_sender is empty — set it in Settings (SETUP.md §2)");
     const verdict = gate("email", rep.rnb_email);
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${rep.rnb_email}` };
+    // Exchange only accepts mail for this address once the user is licensed AND
+    // the mailbox is provisioned. Before that, sendMail still "succeeds" and the
+    // message bounces to the sender's inbox where nobody sees it (Fred Holly,
+    // 2026-09-25). So ask first, and wait rather than send: a `WAIT: ` error
+    // makes the executor retry every 10 minutes for up to 6 hours (index.ts)
+    // instead of the short generic backoff. Reps created before the worker
+    // stored m365_user_id keep the old behaviour.
+    if (rep.m365_user_id) {
+      const readiness = await graph.mailboxReadiness(rep.m365_user_id);
+      if (!readiness.ready) {
+        throw new Error(`WAIT: mailbox ${rep.rnb_email} not ready — ${readiness.detail}`);
+      }
+    }
     // Standing list (Robert, Jose, Albert, Fatima, Diego) + the rep's own city
     // manager, all in cc next to the rep's personal address — the list is
     // visible to the rep by design as of 20260902150000.

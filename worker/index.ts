@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { db, ONBOARDING } from "./db";
+import { db, ONBOARDING, logActivity } from "./db";
 import { getHandler } from "./actions";
 import { sweepInfoFormReminders } from "./sweeps";
 import { watchGustoSignatures } from "./watchers";
@@ -14,10 +14,20 @@ import { alert } from "./alert";
  * backoff; after MAX_ATTEMPTS it lands in `failed` and fires one alert. Failed
  * rows are retriable from the rep drawer (state reset to pending).
  *
+ * Two error prefixes change that schedule:
+ *  - `PERMANENT: ` — fails the row at once (a 400 from Graph will not fix itself).
+ *  - `WAIT: ` — the action is not wrong, the world is not ready (Exchange has
+ *    not provisioned the rep's mailbox yet). Retries on a flat 10-minute cadence
+ *    for up to 6 hours, logs the wait once on the rep's timeline, and only then
+ *    fails with an alert. Exponential backoff was the wrong shape here: it gave
+ *    up after ~30 minutes, and mailbox provisioning is measured in hours.
+ *
  * Gate outcomes (dry-run / pilot blocks) are `skipped` — deliberate no-sends,
  * visible in the drawer with a preview of what WOULD have gone out.
  */
 const MAX_ATTEMPTS = 5;
+const WAIT_EVERY_MIN = 10;
+const WAIT_MAX_ATTEMPTS = 36; // 36 × 10 min = 6 h
 const BATCH = 20;
 const LOCK = path.join(__dirname, ".worker.lock");
 
@@ -114,7 +124,9 @@ async function pass(): Promise<void> {
       const msg = e instanceof Error ? e.message : String(e);
       const attempts = row.attempts + 1;
       const permanent = msg.startsWith("PERMANENT: ");
-      if (permanent || attempts >= MAX_ATTEMPTS) {
+      const waiting = msg.startsWith("WAIT: ");
+      const exhausted = waiting ? attempts >= WAIT_MAX_ATTEMPTS : attempts >= MAX_ATTEMPTS;
+      if (permanent || exhausted) {
         await db()
           .schema(ONBOARDING)
           .from("outbox")
@@ -122,6 +134,27 @@ async function pass(): Promise<void> {
           .eq("id", row.id);
         console.error(`${label} FAILED (final): ${msg}`);
         await alert(`outbox action failed: ${row.action_type}`, `rep=${row.rep_id} outbox_id=${row.id}\n${msg}`);
+      } else if (waiting) {
+        await db()
+          .schema(ONBOARDING)
+          .from("outbox")
+          .update({
+            state: "pending",
+            last_error: msg,
+            run_after: new Date(Date.now() + WAIT_EVERY_MIN * 60_000).toISOString(),
+          })
+          .eq("id", row.id);
+        // Once, not every 10 minutes: the timeline should say why the welcome is
+        // late, not fill up with the same line 36 times.
+        if (attempts === 1 && row.rep_id != null) {
+          await logActivity(
+            row.rep_id as number,
+            "action_waiting",
+            `${row.action_type} is waiting — ${msg.slice("WAIT: ".length)}. Retrying every ${WAIT_EVERY_MIN} min for up to ${(WAIT_MAX_ATTEMPTS * WAIT_EVERY_MIN) / 60} h.`,
+            { outbox_id: row.id },
+          );
+        }
+        console.warn(`${label} waiting, retry in ${WAIT_EVERY_MIN}m (${attempts}/${WAIT_MAX_ATTEMPTS}): ${msg}`);
       } else {
         const backoffMin = 2 ** attempts; // 2, 4, 8, 16 min
         await db()

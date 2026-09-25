@@ -18,7 +18,11 @@ the Jotform×3 + Make.com + Google Sheet chain.
 - **Outbox pattern**: API routes never touch external services — they insert
   `onboarding.outbox` rows; the **worker** (`worker/`, launchd on the mac mini,
   60s single-pass) executes them via connectors behind the gate stack
-  (dry-run default → kill switch → pilot allowlists)
+  (dry-run default → kill switch → pilot allowlists). A thrown action retries
+  with exponential backoff (2/4/8/16 min, then `failed` + alert); a `WAIT: `
+  error instead retries every 10 min for up to 6 h — the welcome email uses
+  it while Exchange provisions the rep's mailbox, because Graph accepts mail
+  for an unprovisioned address and Exchange bounces it later to the sender.
 - **Connectors** (`worker/connectors/`): Graph (app-only + delegated for chat
   sends), Dialpad, HCP (keys resolved from `public.office_configs` per
   territory), Jotform
