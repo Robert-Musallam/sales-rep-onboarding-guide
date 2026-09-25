@@ -224,6 +224,54 @@ export async function findUserByUpn(upn: string): Promise<{ id: string } | null>
   return { id: j.id as string };
 }
 
+export type MailboxReadiness =
+  | { ready: true }
+  | { ready: false; reason: "no_license" | "mailbox_provisioning"; detail: string };
+
+/**
+ * Can Exchange deliver to this user yet?
+ *
+ * A new directory user has no mailbox until a license is assigned AND Exchange
+ * has finished provisioning it, which takes anywhere from minutes to hours.
+ * `sendMail` cannot tell: Graph accepts the message either way, and Exchange
+ * bounces it later (550 5.1.10 RecipientNotFound) to the SENDER's inbox, where
+ * nobody in this pipeline looks. That is how Fred Holly's welcome email was lost
+ * on 2026-09-25 — it went out 2 minutes after the license box was ticked, 58
+ * minutes after the user was created.
+ *
+ * Two probes, cheapest first: licenseDetails (empty → no license yet), then the
+ * Inbox folder (404 → licensed, mailbox still provisioning). A 403 on the
+ * license probe means the app registration lacks the directory scope; that is
+ * not the rep's problem, so the check falls through to the mailbox probe.
+ */
+export async function mailboxReadiness(userId: string): Promise<MailboxReadiness> {
+  const token = await getAppToken();
+  const id = encodeURIComponent(userId);
+
+  const lic = await graphFetch(token, `/users/${id}/licenseDetails?$select=skuPartNumber`);
+  let skus: string[] | null = null;
+  if (lic.status !== 403) {
+    const j = await must(lic, "graph licenseDetails");
+    skus = ((j.value ?? []) as Array<{ skuPartNumber?: string }>).map((l) => l.skuPartNumber ?? "?");
+    if (!skus.length) {
+      return { ready: false, reason: "no_license", detail: "no Microsoft 365 license assigned yet" };
+    }
+  }
+
+  const inbox = await graphFetch(token, `/users/${id}/mailFolders/inbox?$select=id`);
+  if (inbox.status === 404) {
+    const text = (await inbox.text()).replace(/\s+/g, " ").slice(0, 200);
+    const licensed = skus ? `licensed (${skus.join(", ")}) but ` : "";
+    return {
+      ready: false,
+      reason: "mailbox_provisioning",
+      detail: `${licensed}Exchange has no mailbox for this user yet: 404 ${text}`,
+    };
+  }
+  await must(inbox, "graph mailFolders/inbox");
+  return { ready: true };
+}
+
 // ── Mail ─────────────────────────────────────────────────────────────────────
 
 export async function sendMail(opts: {
