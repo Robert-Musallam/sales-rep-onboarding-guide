@@ -178,6 +178,13 @@ async function handleInfoForm(submissionId: string, raw: Record<string, unknown>
   if (raw["q46_phoneOs"]) patch.phone_os = String(raw["q46_phoneOs"]);
   const dob = dateFrom(raw["q39_dob"]);
   if (dob) patch.dob = dob;
+  // "Contractor type" (added to the form 2026-09-28). Matched by field name,
+  // not qid: Jotform numbers questions when they are created, so a rebuilt or
+  // cloned form would silently change the qid and lose the answer.
+  const contractorKey = Object.keys(raw).find((k) => /contractor/i.test(k));
+  const contractorRaw = contractorKey ? String(raw[contractorKey] ?? "") : "";
+  if (/business/i.test(contractorRaw)) patch.contractor_type = "business";
+  else if (/individual/i.test(contractorRaw)) patch.contractor_type = "individual";
 
   await supabase.schema("onboarding").from("reps").update(patch).eq("id", rep.id);
   await supabase.schema("onboarding").from("form_submissions").update({ rep_id: rep.id }).eq("submission_id", submissionId);

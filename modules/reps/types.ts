@@ -24,6 +24,7 @@ export interface Rep {
   personal_email: string | null;
   phone_e164: string | null;
   phone_os: string | null;
+  contractor_type: "individual" | "business" | null;
   home_address: string | null;
   zip_code: string | null;
   dob: string | null;
