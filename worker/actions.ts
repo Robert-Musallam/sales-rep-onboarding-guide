@@ -28,6 +28,7 @@ export interface Rep {
   personal_email: string | null;
   phone_e164: string | null;
   phone_os: string | null;
+  contractor_type: "individual" | "business" | null;
   home_address: string | null;
   zip_code: string | null;
   info: Record<string, unknown>;
@@ -233,6 +234,14 @@ function repVars(rep: Rep): Record<string, string | null> {
     last_name: rep.last_name,
     territory: rep.territory?.name ?? null,
     manager_name: rep.manager_name,
+    // What ops picks in Gusto. Reps from before the form asked have none;
+    // say so rather than render an empty line.
+    contractor_type:
+      rep.contractor_type === "business"
+        ? "Business (EIN)"
+        : rep.contractor_type === "individual"
+          ? "Individual (1099)"
+          : "not answered",
     rnb_email: rep.rnb_email,
     phone: rep.phone_e164,
     // The welcome email prints this. Falls back to the constant for reps
