@@ -775,6 +775,28 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     await logActivity(repId, "checklist_autocompleted", `Auto-completed: ${keys.join(", ")}`);
     return { done: true };
   },
+  /**
+   * Payment-confirmation email from the GCVPM Payroll screen. Unlike the rep
+   * automations this row carries no rep (rep_id is null): the recipient and the
+   * fully-rendered subject/body come in the payload, so the worker just sends it.
+   * Respects the same send gate as every other channel.
+   */
+  "notify.payment": async (_repId, payload) => {
+    const channel = String(payload.channel ?? "email");
+    if (channel !== "email") throw new Error(`notify.payment: unsupported channel ${channel}`);
+    const toEmail = String(payload.to_email ?? "").trim();
+    if (!toEmail) throw new Error("notify.payment: payload.to_email is empty");
+    const subject = String(payload.subject ?? "Payment confirmation");
+    const bodyText = String(payload.body ?? "");
+    const sender = (await getSetting<string>("welcome_email_sender")) ?? "";
+    if (!sender) throw new Error("app_settings.welcome_email_sender is empty — set it in Settings");
+    const verdict = gate("email", toEmail);
+    if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${toEmail}` };
+    await graph.sendMail({ fromUpn: sender, to: [toEmail], subject, html: bodyText.replace(/\n/g, "<br>") });
+    const meta = (payload.meta ?? {}) as Record<string, unknown>;
+    console.log(`[notify.payment] payment email -> ${toEmail} (pay_run ${String(meta.pay_run_id ?? "?")})`);
+    return { done: true, note: `Payment email -> ${toEmail}` };
+  },
 };
 
 export function getHandler(actionType: string) {
