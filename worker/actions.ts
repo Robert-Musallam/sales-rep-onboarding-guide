@@ -788,7 +788,7 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     if (!toEmail) throw new Error("notify.payment: payload.to_email is empty");
     const subject = String(payload.subject ?? "Payment confirmation");
     const bodyText = String(payload.body ?? "");
-    const sender = (await getSetting<string>("welcome_email_sender")) ?? "";
+    const sender = String(payload.from ?? "").trim() || (await getSetting<string>("welcome_email_sender")) ?? "";
     if (!sender) throw new Error("app_settings.welcome_email_sender is empty — set it in Settings");
     const verdict = gate("email", toEmail);
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${toEmail}` };
