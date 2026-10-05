@@ -281,6 +281,7 @@ export async function sendMail(opts: {
   bcc?: string[];
   subject: string;
   html: string;
+  attachments?: { filename: string; contentType: string; contentBase64: string }[];
 }): Promise<void> {
   const token = await getAppToken();
   const addr = (a: string) => ({ emailAddress: { address: a } });
@@ -294,6 +295,12 @@ export async function sendMail(opts: {
           toRecipients: opts.to.map(addr),
           ccRecipients: (opts.cc ?? []).map(addr),
           bccRecipients: (opts.bcc ?? []).map(addr),
+          attachments: (opts.attachments ?? []).map((a) => ({
+            "@odata.type": "#microsoft.graph.fileAttachment",
+            name: a.filename,
+            contentType: a.contentType,
+            contentBytes: a.contentBase64,
+          })),
         },
         saveToSentItems: "true",
       }),

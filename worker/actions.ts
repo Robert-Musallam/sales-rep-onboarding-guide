@@ -792,7 +792,10 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     if (!sender) throw new Error("app_settings.welcome_email_sender is empty — set it in Settings");
     const verdict = gate("email", toEmail);
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${toEmail}` };
-    await graph.sendMail({ fromUpn: sender, to: [toEmail], subject, html: bodyText.replace(/\n/g, "<br>") });
+    const attachments = Array.isArray(payload.attachments)
+      ? (payload.attachments as { filename: string; contentType: string; contentBase64: string }[])
+      : undefined;
+    await graph.sendMail({ fromUpn: sender, to: [toEmail], subject, html: bodyText.replace(/\n/g, "<br>"), attachments });
     const meta = (payload.meta ?? {}) as Record<string, unknown>;
     console.log(`[notify.payment] payment email -> ${toEmail} (pay_run ${String(meta.pay_run_id ?? "?")})`);
     return { done: true, note: `Payment email -> ${toEmail}` };
