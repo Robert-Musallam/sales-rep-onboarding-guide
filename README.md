@@ -1,5 +1,16 @@
 # RNB Onboarding
 
+> ⚠️ **Screens in this repo are frozen (since 2026-09-28).** The onboarding
+> screens — reps, drawer, settings, intake, hub — are edited in
+> [`gcv-renewals`](https://github.com/Robert-Musallam/gcv-renewals) under
+> `/rnb/*` (Holding OS → RNB) and nowhere else. This deployment stays up because
+> it serves the `/my/<token>` and `/intake/<token>` links people already hold and
+> owns the Microsoft sign-in. **What this repo still owns and where changes go
+> live:** `worker/` (the Mac mini, `git pull` in `~/rnb-onboarding`),
+> `supabase/functions/jotform-webhook` (edge-function deploy) and
+> `supabase/migrations/` (`npm run migrate` on the Mac). Do not edit `app/`,
+> `modules/` or `components/` here.
+
 Rock N Block's sales-rep onboarding brain: one webapp that owns the pipeline,
 runs the automations natively (Dialpad SMS, Microsoft user/Teams/email, Housecall
 Pro, Jotform), and gates readiness behind a training curriculum + test. Replaces
