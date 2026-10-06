@@ -282,6 +282,10 @@ export async function sendMail(opts: {
   subject: string;
   html: string;
   attachments?: { filename: string; contentType: string; contentBase64: string }[];
+  /** Friendly "from" display name (the address stays fromUpn). */
+  fromName?: string;
+  /** Reply-To addresses. */
+  replyTo?: string[];
 }): Promise<void> {
   const token = await getAppToken();
   const addr = (a: string) => ({ emailAddress: { address: a } });
@@ -291,6 +295,8 @@ export async function sendMail(opts: {
       body: JSON.stringify({
         message: {
           subject: opts.subject,
+          ...(opts.fromName ? { from: { emailAddress: { name: opts.fromName, address: opts.fromUpn } } } : {}),
+          ...(opts.replyTo && opts.replyTo.length ? { replyTo: opts.replyTo.map(addr) } : {}),
           body: { contentType: "HTML", content: opts.html },
           toRecipients: opts.to.map(addr),
           ccRecipients: (opts.cc ?? []).map(addr),
