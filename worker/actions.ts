@@ -795,7 +795,10 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     const attachments = Array.isArray(payload.attachments)
       ? (payload.attachments as { filename: string; contentType: string; contentBase64: string }[])
       : undefined;
-    await graph.sendMail({ fromUpn: sender, to: [toEmail], subject, html: bodyText.replace(/\n/g, "<br>"), attachments });
+    const fromName = String(payload.from_name ?? "").trim() || undefined;
+    const replyToOne = String(payload.reply_to ?? "").trim();
+    const replyTo = replyToOne ? [replyToOne] : undefined;
+    await graph.sendMail({ fromUpn: sender, to: [toEmail], subject, html: bodyText.replace(/\n/g, "<br>"), attachments, fromName, replyTo });
     const meta = (payload.meta ?? {}) as Record<string, unknown>;
     console.log(`[notify.payment] payment email -> ${toEmail} (pay_run ${String(meta.pay_run_id ?? "?")})`);
     return { done: true, note: `Payment email -> ${toEmail}` };
