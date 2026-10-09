@@ -139,6 +139,21 @@ export function Shell({
 
       {/* Content */}
       <div className="lg:pl-56 min-h-screen flex flex-col">
+        {/* Screens here are frozen since 2026-09-28: the live onboarding UI is
+            Holding OS → RNB. This deployment stays up for the rep hub, the
+            intake links and the Microsoft sign-in; everything else is
+            read-only history. Say so on every page so nobody works here. */}
+        <div
+          role="status"
+          className="sticky top-0 z-20 bg-amber-100 text-amber-900 border-b border-amber-300 px-4 py-2 text-[13px] text-center"
+        >
+          <b>Deprecated.</b> These screens are no longer maintained. Manage reps, onboarding and
+          settings in{" "}
+          <a href="https://gcv-renewals.vercel.app/rnb/reps" className="underline font-semibold">
+            Holding OS → RNB
+          </a>
+          . Only the rep hub and intake links still live here.
+        </div>
         <main className="mx-auto max-w-[1600px] w-full px-4 py-5 flex-1">{children}</main>
       </div>
     </div>
