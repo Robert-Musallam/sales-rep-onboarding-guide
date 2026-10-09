@@ -1,4 +1,4 @@
-import { db, ONBOARDING, getSetting, logActivity } from "./db";
+import { db, ONBOARDING, getSetting, logActivity, rememberSetting } from "./db";
 import * as graph from "./connectors/graph";
 
 /**
@@ -182,5 +182,6 @@ export async function watchGustoSignatures(): Promise<void> {
       .from("app_settings")
       .update({ value: newest })
       .eq("key", "gusto_signature_cursor");
+    rememberSetting("gusto_signature_cursor", newest);
   }
 }
