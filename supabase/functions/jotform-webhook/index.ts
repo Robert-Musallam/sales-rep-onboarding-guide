@@ -143,12 +143,12 @@ async function handleManagerForm(submissionId: string, raw: Record<string, unkno
 async function handleInfoForm(submissionId: string, raw: Record<string, unknown>): Promise<string> {
   const phoneRaw = (raw["q41_phoneNumber"] as { full?: string })?.full ?? "";
 
-  let rep: { id: number } | null = null;
+  let rep: { id: number; status: string } | null = null;
   {
     const { data } = await supabase
       .schema("onboarding")
       .from("reps")
-      .select("id")
+      .select("id, status")
       .eq("jotform_info_submission_id", submissionId)
       .maybeSingle();
     rep = data;
@@ -157,7 +157,7 @@ async function handleInfoForm(submissionId: string, raw: Record<string, unknown>
     const { data } = await supabase
       .schema("onboarding")
       .from("reps")
-      .select("id, phone_e164")
+      .select("id, status, phone_e164")
       .not("phone_e164", "is", null)
       .order("created_at", { ascending: false });
     rep = (data ?? []).find((r) => digits10(r.phone_e164) === digits10(phoneRaw)) ?? null;
@@ -165,10 +165,13 @@ async function handleInfoForm(submissionId: string, raw: Record<string, unknown>
   if (!rep) return "ok (unmatched)";
 
   const patch: Record<string, unknown> = {
-    status: "info_submitted",
     jotform_info_submission_id: submissionId,
     info: raw,
   };
+  // Forward only. The edit link stays valid for the rep's whole onboarding and
+  // a submission can also be re-saved through the API (e.g. a phone backfill);
+  // neither may drag an active rep back to info_submitted.
+  if (rep.status === "invited") patch.status = "info_submitted";
   if (raw["q42_firstName"]) patch.first_name = String(raw["q42_firstName"]);
   if (raw["q43_lastName"]) patch.last_name = String(raw["q43_lastName"]);
   if (phoneRaw) patch.phone_e164 = `+1${digits10(phoneRaw)}`;

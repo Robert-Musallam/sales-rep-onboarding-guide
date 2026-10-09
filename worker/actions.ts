@@ -340,8 +340,16 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
       const formId = (await getSetting<string>("jotform_info_form_id")) ?? "";
       // Prefill fields 41/42/43 (phone/first/last) — the exact fields the Make
       // scenario prefilled on the live "Onboarding Basic Information" form.
+      //
+      // The phone goes in as "41_full", not "41". Field 41 is a control_phone
+      // with the single masked input, and it is HIDDEN on the form: the rep
+      // never types it, the prefill is the only source. "41" stores a bare
+      // string that the hidden widget cannot load when the rep opens the edit
+      // link, so every edit from 2026-09-23 on came back with full = "".
+      // "41_full" stores {full: "(408) 410-5938"}, the shape the form itself
+      // writes, and the hidden field carries it through the edit.
       const created = await jotform.createSubmission(formId, {
-        "41": jotform.prettyPhone(rep.phone_e164),
+        "41_full": jotform.prettyPhone(rep.phone_e164),
         "42": rep.first_name,
         "43": rep.last_name,
       });
@@ -454,7 +462,8 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
       "3_last": rep.last_name,
       "8": rep.territory?.name ?? "",
       "31": rep.manager_name ?? "",
-      "32": jotform.prettyPhone(rep.phone_e164),
+      // "_full" for the same reason as the rep-info prefill (see rep.invite).
+      "32_full": jotform.prettyPhone(rep.phone_e164),
       "34": rep.personal_email ?? "",
       "35": "Design Consultant",
     };
