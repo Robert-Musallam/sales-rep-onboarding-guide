@@ -201,10 +201,12 @@ export async function getUserProfile(userId: string): Promise<Record<string, unk
  */
 export async function updateUser(
   userId: string,
-  patch: { displayName?: string | null; contact?: ContactInfo },
+  patch: { displayName?: string | null; givenName?: string | null; surname?: string | null; contact?: ContactInfo },
 ): Promise<void> {
   const body: Record<string, unknown> = { ...contactPayload(patch.contact) };
   if (patch.displayName?.trim()) body.displayName = patch.displayName.trim();
+  if (patch.givenName?.trim()) body.givenName = patch.givenName.trim();
+  if (patch.surname?.trim()) body.surname = patch.surname.trim();
   if (!Object.keys(body).length) return;
   const token = await getAppToken();
   await must(

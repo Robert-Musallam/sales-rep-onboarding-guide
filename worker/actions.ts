@@ -785,6 +785,47 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     return { done: true };
   },
   /**
+   * The drawer changed the rep's name (PATCH /api/rnb/reps/[id] in Holding OS
+   * queues this). Carry it to every system that copied the old one: the
+   * Microsoft 365 user (display, given and surname — the UPN keeps its
+   * initial+lastname), the rep-info Jotform submission (42/43) and the
+   * manager-form mirror (3_first/3_last). Reads the rep row rather than the
+   * payload, so the latest name wins when two edits queue up.
+   */
+  "rep.sync_name": async (repId) => {
+    const rep = await loadRep(repId);
+    const full = `${rep.first_name} ${rep.last_name}`.trim();
+    const verdict = gate("provision");
+    if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would rename to "${full}" in M365 + Jotform` };
+    const touched: string[] = [];
+    if (rep.m365_user_id) {
+      await graph.updateUser(rep.m365_user_id, {
+        displayName: full,
+        givenName: rep.first_name,
+        surname: rep.last_name,
+      });
+      touched.push(`M365 ${rep.rnb_email ?? rep.m365_user_id}`);
+    }
+    if (rep.jotform_info_submission_id) {
+      await jotform.updateSubmission(rep.jotform_info_submission_id, { "42": rep.first_name, "43": rep.last_name });
+      touched.push("info form");
+    }
+    const { data: mirror } = await db()
+      .schema(ONBOARDING)
+      .from("form_submissions")
+      .select("submission_id")
+      .eq("rep_id", repId)
+      .eq("source", "native_mirror")
+      .maybeSingle();
+    if (mirror?.submission_id) {
+      await jotform.updateSubmission(String(mirror.submission_id), { "3_first": rep.first_name, "3_last": rep.last_name });
+      touched.push("manager form mirror");
+    }
+    const note = touched.length ? `"${full}" → ${touched.join(", ")}` : `"${full}" — nothing to sync yet`;
+    await logActivity(repId, "name_synced", `Name synced: ${note}`);
+    return { done: true, note };
+  },
+  /**
    * Payment-confirmation email from the GCVPM Payroll screen. Unlike the rep
    * automations this row carries no rep (rep_id is null): the recipient and the
    * fully-rendered subject/body come in the payload, so the worker just sends it.
