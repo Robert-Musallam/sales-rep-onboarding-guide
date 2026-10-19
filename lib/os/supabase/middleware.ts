@@ -1,5 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { HOLDING_OS_RNB_URL } from "@/lib/holdingOs";
+
+/**
+ * The admin screens were switched off on 2026-10-19: these paths go to Holding
+ * OS → RNB before any session check, so an anonymous visitor is not asked to
+ * sign in to a screen that no longer exists. /login stays reachable on its
+ * own, for the Microsoft consent; /my/<token>, /intake/<token>, /guide/* and
+ * /api/* are untouched.
+ */
+const RETIRED = /^\/(reps|settings|training|intake|guide)?$/;
 
 /**
  * Refreshes the Supabase auth session on every request and redirects
@@ -13,6 +23,10 @@ import { NextResponse, type NextRequest } from "next/server";
  * version of the same form, and only the tokenized path is public.
  */
 export async function updateSession(request: NextRequest) {
+  if (RETIRED.test(request.nextUrl.pathname)) {
+    return NextResponse.redirect(HOLDING_OS_RNB_URL);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -58,10 +72,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Already signed in (e.g. right after the Microsoft consent): there is
+  // nothing to show here, so go where the screens are.
   if (user && path.startsWith("/login")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/reps";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(HOLDING_OS_RNB_URL);
   }
 
   return supabaseResponse;
