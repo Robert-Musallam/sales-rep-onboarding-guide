@@ -1,11 +1,12 @@
 # RNB Onboarding
 
-> ⚠️ **Screens in this repo are frozen (since 2026-09-28).** The onboarding
-> screens — reps, drawer, settings, intake, hub — are edited in
+> ⚠️ **The admin screens in this repo are switched off (since 2026-10-19).**
+> `/reps`, `/settings`, `/training` and the rest redirect to
 > [`gcv-renewals`](https://github.com/Robert-Musallam/gcv-renewals) under
-> `/rnb/*` (Holding OS → RNB) and nowhere else. This deployment stays up because
-> it serves the `/my/<token>` and `/intake/<token>` links people already hold and
-> owns the Microsoft sign-in. **What this repo still owns and where changes go
+> `/rnb/*` (Holding OS → RNB), where they are edited and used. This deployment
+> stays up because it serves the `/my/<token>` and `/intake/<token>` links
+> people already hold and owns the Microsoft sign-in (`/login` exists only for
+> that consent). **What this repo still owns and where changes go
 > live:** `worker/` (the Mac mini, `git pull` in `~/rnb-onboarding`),
 > `supabase/functions/jotform-webhook` (edge-function deploy) and
 > `supabase/migrations/` (`npm run migrate` on the Mac). Do not edit `app/`,

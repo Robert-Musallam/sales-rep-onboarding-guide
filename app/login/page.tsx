@@ -46,8 +46,15 @@ function LoginForm() {
             Onboarding
           </div>
         </div>
-        <p className="text-muted text-[13px] mb-5">
+        <p className="text-muted text-[13px] mb-2">
           Rock N Block — sales rep onboarding tool
+        </p>
+        <p className="text-[12px] text-amber-800 bg-amber-100 border border-amber-300 rounded px-3 py-2 mb-5">
+          Onboarding moved to{" "}
+          <a href="https://gcv-renewals.vercel.app/rnb/reps" className="underline font-semibold">
+            Holding OS → RNB
+          </a>
+          . Sign in here only to connect the Microsoft account; every other screen redirects there.
         </p>
 
         <form onSubmit={onSubmit} className="space-y-3">
