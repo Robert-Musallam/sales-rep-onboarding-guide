@@ -55,6 +55,8 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
     { actionType: "teams.join_company_chat" },
     { actionType: "teams.company_announcement" },
     { actionType: "email.welcome" },
+    // Last: the rep is welcomed, so they go into the company directory workbook.
+    { actionType: "directory.add_rep" },
   ],
 
   // Checklist: "Housecall Pro user created" checked

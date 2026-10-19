@@ -355,6 +355,73 @@ export async function listInboxSince(mailbox: string, since: string, top = 100):
   }));
 }
 
+// ── Excel (workbook API) ─────────────────────────────────────────────────────
+//
+// Used for the company directory workbook on SharePoint. Worksheets are
+// addressed by id, not name: the directory sheet's name has spaces, and a
+// quoted name in the URL is the first thing Graph rejects. Values go in as
+// Excel sees them (numbers for phones, date serials for birthdays), with a
+// numberFormat row when the display matters.
+
+export interface ExcelRange {
+  address: string; // "'Sheet'!A3:H123"
+  startRow: number; // 3
+  values: unknown[][];
+  text: string[][];
+}
+
+function workbookPath(driveId: string, itemId: string, worksheetId: string): string {
+  return `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}`;
+}
+
+/** The worksheet's used range: values, display text and the absolute row it starts on. */
+export async function excelUsedRange(driveId: string, itemId: string, worksheetId: string): Promise<ExcelRange> {
+  const token = await getAppToken();
+  const j = await must(await graphFetch(token, `${workbookPath(driveId, itemId, worksheetId)}/usedRange`), "graph usedRange");
+  const address = String(j.address ?? "");
+  const m = address.split("!").pop()?.match(/[A-Z]+(\d+)/);
+  if (!m) throw new Error(`graph usedRange: unexpected address ${address}`);
+  return {
+    address,
+    startRow: Number(m[1]),
+    values: (j.values as unknown[][]) ?? [],
+    text: (j.text as string[][]) ?? [],
+  };
+}
+
+/** Insert blank cells at `address` (e.g. "A66:H66"), shifting what was there down. */
+export async function excelInsertRows(driveId: string, itemId: string, worksheetId: string, address: string): Promise<void> {
+  const token = await getAppToken();
+  await must(
+    await graphFetch(token, `${workbookPath(driveId, itemId, worksheetId)}/range(address='${address}')/insert`, {
+      method: "POST",
+      body: JSON.stringify({ shift: "Down" }),
+    }),
+    `graph range insert ${address}`,
+  );
+}
+
+/** Write values (and optionally number formats) into `address`. */
+export async function excelWriteRange(
+  driveId: string,
+  itemId: string,
+  worksheetId: string,
+  address: string,
+  values: unknown[][],
+  numberFormat?: string[][],
+): Promise<void> {
+  const token = await getAppToken();
+  const body: Record<string, unknown> = { values };
+  if (numberFormat) body.numberFormat = numberFormat;
+  await must(
+    await graphFetch(token, `${workbookPath(driveId, itemId, worksheetId)}/range(address='${address}')`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+    `graph range write ${address}`,
+  );
+}
+
 // ── Chats ────────────────────────────────────────────────────────────────────
 
 const member = (idOrUpn: string) => ({
