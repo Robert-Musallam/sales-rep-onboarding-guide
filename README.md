@@ -49,7 +49,8 @@ rep submits info form ──► edge fn ──► status=info_submitted ──�
 ☑ Gusto           ──► create M365 user (temp password in drawer)
 ☑ M365 license    ──► 1:1 DM · Phone Room chat+roster · territory chats ·
                       compat employee_teams_chats row · company announcement ·
-                      welcome email (configurable sender) · app-download SMS
+                      welcome email (configurable sender) · app-download SMS ·
+                      row in the SharePoint company directory workbook
 ☑ HCP user        ──► create HCP employee (territory API key)
 ☑ Business cards  ──► request email to configured contact
 rep passes final quiz ──► training item auto-completes

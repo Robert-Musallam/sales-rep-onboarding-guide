@@ -31,6 +31,7 @@ export interface Rep {
   contractor_type: "individual" | "business" | null;
   home_address: string | null;
   zip_code: string | null;
+  dob: string | null;
   info: Record<string, unknown>;
   manager_name: string | null;
   territory_id: number | null;
@@ -324,6 +325,24 @@ async function sendSmsCopy(rep: Rep, templateKey: string, body: string): Promise
     await logActivity(rep.id, "sms_copy_failed", `Ops SMS copy failed: ${(e as Error).message}`).catch(() => {});
   }
 }
+
+/** Directory sheet: territory → the header row that opens its block. */
+const DIRECTORY_SECTION: Record<string, string> = {
+  "Las Vegas": "Las Vegas - Sales & Production",
+  "San Diego": "San Diego - Sales & Production",
+  "OC/IE": "Orange County/Inland Empire - Sales & Production",
+  "Santa Clara": "Santa Clara - Sales & Production",
+  Arizona: "Arizona - Sales & Production",
+  Utah: "Utah - Sales & Production",
+  Colorado: "Colorado - Sales & Production",
+  Tampa: "Tampa - Sales & Production",
+};
+
+/** Directory sheet: what the "Office" column says for a territory when it differs. */
+const DIRECTORY_OFFICE: Record<string, string> = {
+  Colorado: "Denver",
+  Tampa: "Florida",
+};
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -768,6 +787,66 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     await graph.sendMail({ fromUpn: sender, to: [contact], subject, html: body.replace(/\n/g, "<br>") });
     await logActivity(repId, "business_cards_requested", `Business-card request → ${contact}`);
     return { done: true };
+  },
+
+  /**
+   * Company directory (the "Rock N Block Company Directory.xlsx" workbook on
+   * SharePoint, site SRC): once the rep is welcomed, add them as the last row
+   * of their office's "<City> - Sales & Production" block. The workbook ids
+   * live in app_settings so a moved or re-created file is a settings change.
+   *
+   * The sheet is hand-kept: sections are contiguous blocks under a header row
+   * in column A, columns are Job Title / Name / Phone / Office / Email /
+   * Birthday, phones are plain 10-digit numbers and birthdays are real dates
+   * shown as d-mmm. We match that, insert a row at the end of the block
+   * (shifting the next header down) and never touch anything else. Idempotent
+   * on the RNB email in column E.
+   */
+  "directory.add_rep": async (repId) => {
+    const rep = await loadRep(repId);
+    if (!rep.rnb_email) throw new Error("rep has no rnb_email yet");
+    const driveId = (await getSetting<string>("company_directory_drive_id")) ?? "";
+    const itemId = (await getSetting<string>("company_directory_item_id")) ?? "";
+    const worksheetId = (await getSetting<string>("company_directory_worksheet_id")) ?? "";
+    if (!driveId || !itemId || !worksheetId) {
+      throw new Error("PERMANENT: company_directory_* settings are empty — set drive, item and worksheet ids in Settings");
+    }
+    const territory = rep.territory?.name ?? "";
+    const section = DIRECTORY_SECTION[territory];
+    if (!section) throw new Error(`PERMANENT: no directory section mapped for territory "${territory || "—"}"`);
+    const verdict = gate("provision");
+    if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would add ${rep.first_name} ${rep.last_name} under "${section}"` };
+
+    const range = await graph.excelUsedRange(driveId, itemId, worksheetId);
+    const email = rep.rnb_email.toLowerCase();
+    const listedAt = range.values.findIndex((row) => String(row[4] ?? "").trim().toLowerCase() === email);
+    if (listedAt >= 0) return { done: true, note: `already listed (row ${range.startRow + listedAt})` };
+
+    const isHeader = (row: unknown[]) => /Sales & Production|Division$/.test(String(row[0] ?? ""));
+    const headerIdx = range.values.findIndex((row) => String(row[0] ?? "").trim() === section);
+    if (headerIdx < 0) throw new Error(`PERMANENT: section "${section}" not found in the directory sheet`);
+    let nextIdx = range.values.findIndex((row, i) => i > headerIdx && isHeader(row));
+    if (nextIdx < 0) nextIdx = range.values.length;
+    const rowNo = range.startRow + nextIdx; // becomes the last row of the block
+
+    const digits = (rep.phone_e164 ?? "").replace(/\D/g, "").slice(-10);
+    const phone: number | string = digits.length === 10 ? Number(digits) : (rep.phone_e164 ?? "");
+    // Excel serial date (days since 1899-12-30), so the cell is a real date like its neighbours.
+    const dobSerial = rep.dob ? Math.round((Date.parse(rep.dob + "T00:00:00Z") - Date.UTC(1899, 11, 30)) / 86_400_000) : "";
+    const values = [[
+      "Design Consultant",
+      `${rep.first_name} ${rep.last_name}`.trim(),
+      phone,
+      DIRECTORY_OFFICE[territory] ?? territory,
+      rep.rnb_email,
+      dobSerial,
+    ]];
+    await graph.excelInsertRows(driveId, itemId, worksheetId, `A${rowNo}:H${rowNo}`);
+    await graph.excelWriteRange(driveId, itemId, worksheetId, `A${rowNo}:F${rowNo}`, values, [
+      ["General", "General", "General", "General", "General", "d-mmm"],
+    ]);
+    await logActivity(repId, "directory_added", `Added to the company directory under "${section}" (row ${rowNo})`);
+    return { done: true, note: `row ${rowNo} under "${section}"` };
   },
 
   /** System-completes checklist items (welcome_message/team_channel/training). */
