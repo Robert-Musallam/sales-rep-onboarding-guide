@@ -577,6 +577,19 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     const { body } = await renderTemplate("teams.dm_welcome", repVars(rep));
     await graph.sendChatMessage(chatId, body);
     await logActivity(repId, "teams_dm_sent", "Created 1:1 Teams chat and sent welcome DM");
+    // The Sales Training notebook goes in as its own message and gets pinned
+    // (told 2026-10-19), so it stays at the top of the chat instead of
+    // scrolling away inside the welcome text. Empty setting = nothing to pin.
+    const notebookUrl = ((await getSetting<string>("sales_training_notebook_url")) ?? "").trim();
+    if (notebookUrl) {
+      const { id: messageId } = await graph.sendChatMessage(
+        chatId,
+        `📘 <b>Sales Training notebook</b> — our process, the tools we use, objection handling and more. <a href="${notebookUrl}">Open the notebook</a>`,
+      );
+      await graph.pinChatMessage(chatId, messageId);
+      await logActivity(repId, "teams_dm_pinned", "Pinned the Sales Training notebook link in the 1:1 chat");
+      return { done: true, note: "welcome DM + pinned Sales Training link" };
+    }
     return { done: true };
   },
 

@@ -470,13 +470,31 @@ export async function addChatMember(chatId: string, userId: string): Promise<voi
 }
 
 /** Chat message sends require DELEGATED auth — they come from the consented human account. */
-export async function sendChatMessage(chatId: string, html: string): Promise<void> {
+export async function sendChatMessage(chatId: string, html: string): Promise<{ id: string }> {
   const token = await getDelegatedToken();
-  await must(
+  const j = await must(
     await graphFetch(token, `/chats/${chatId}/messages`, {
       method: "POST",
       body: JSON.stringify({ body: { contentType: "html", content: html } }),
     }),
     "graph sendChatMessage",
   );
+  return { id: String(j.id ?? "") };
+}
+
+/**
+ * Pin a message in a chat (what "Pin" does in the Teams UI). Delegated, like
+ * the send: the same Chat.ReadWrite consent covers it. Pinning twice is a 409
+ * from Graph, which we treat as already done.
+ */
+export async function pinChatMessage(chatId: string, messageId: string): Promise<void> {
+  const token = await getDelegatedToken();
+  const res = await graphFetch(token, `/chats/${chatId}/pinnedMessages`, {
+    method: "POST",
+    body: JSON.stringify({
+      "message@odata.bind": `https://graph.microsoft.com/v1.0/chats/${chatId}/messages/${messageId}`,
+    }),
+  });
+  if (res.status === 409) return;
+  await must(res, "graph pinChatMessage");
 }
