@@ -33,6 +33,11 @@ export const ENV = {
   hcpBaseUrl: () => process.env.HCP_BASE_URL ?? "https://api.housecallpro.com",
 
   slackWebhookUrl: () => process.env.SLACK_WEBHOOK_URL ?? "",
+
+  // Academy's Supabase project — only for the company directory mirror. Both
+  // optional: unset means the mirror is off (worker/directory-sync.ts).
+  academySupabaseUrl: () => process.env.ACADEMY_SUPABASE_URL ?? "",
+  academyServiceRoleKey: () => process.env.ACADEMY_SUPABASE_SERVICE_ROLE_KEY ?? "",
 };
 
 /**
