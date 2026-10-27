@@ -108,6 +108,8 @@ function parseMain(sheet: Sheet, active: boolean, order: { n: number }, seen: Ma
       birthday_month: bm,
       birthday_day: bd,
       start_date: startDate(t[6], sheet.values[i]?.[6]),
+      // Column H is free text ("my phone", "start date approx. (table backfill)").
+      notes: orNull(text(t[7])),
       active,
       sort_order: (order.n += 10),
       source_key: keyFor(seen, "employee", block, name),
