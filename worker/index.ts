@@ -4,6 +4,7 @@ import { db, ONBOARDING, logActivity } from "./db";
 import { getHandler } from "./actions";
 import { sweepInfoFormReminders } from "./sweeps";
 import { watchGustoSignatures } from "./watchers";
+import { syncCompanyDirectory } from "./directory-sync";
 import { alert } from "./alert";
 
 /**
@@ -63,6 +64,14 @@ async function pass(): Promise<void> {
     await watchGustoSignatures();
   } catch (e) {
     console.error("gusto signature watch failed:", e instanceof Error ? e.message : String(e));
+  }
+  // Hourly, self-gated: the company directory workbook → Academy's mirror table.
+  try {
+    await syncCompanyDirectory();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("company directory sync failed:", msg);
+    await alert("company directory sync failed", msg);
   }
   const { data: rows, error } = await db()
     .schema(ONBOARDING)

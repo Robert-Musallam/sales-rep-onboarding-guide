@@ -35,6 +35,12 @@ the Jotform×3 + Make.com + Google Sheet chain.
   error instead retries every 10 min for up to 6 h — the welcome email uses
   it while Exchange provisions the rep's mailbox, because Graph accepts mail
   for an unprovisioned address and Exchange bounces it later to the sender.
+- **Company directory mirror** (`worker/directory-sync.ts`): once an hour the
+  worker reads all five sheets of "Rock N Block Company Directory.xlsx" and
+  upserts Academy's `public.directory_people` (project `academy`, env
+  `ACADEMY_SUPABASE_URL` / `ACADEMY_SUPABASE_SERVICE_ROLE_KEY` on the Mac).
+  The workbook is the master; rows it no longer has are marked inactive, never
+  deleted. Last run: `app_settings.company_directory_synced_at`.
 - **Connectors** (`worker/connectors/`): Graph (app-only + delegated for chat
   sends), Dialpad, HCP (keys resolved from `public.office_configs` per
   territory), Jotform
