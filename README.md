@@ -44,6 +44,14 @@ the Jotform×3 + Make.com + Google Sheet chain.
   "Start Date" (first filled by `scripts/directory_start_dates.ts` from
   `employee_teams_chats.created_at`; the welcome writes the intake's start date
   for new reps) mirrors to `start_date`.
+- **Birthday / anniversary greetings** (`worker/greetings.ts`): once a day after
+  `greetings_hour` local time (`greetings_timezone`), the worker reads the
+  mirror and posts one Teams message per person per kind into
+  `greetings_chat_id`, for the job titles in `greetings_job_titles`, using the
+  `teams.birthday` / `teams.anniversary` templates. Approximate start dates
+  (notes say "table backfill") never count as anniversaries. Record and
+  idempotency: `onboarding.directory_greetings`. Dry run:
+  `npx tsx scripts/greetings_dry_run.ts --date=YYYY-MM-DD [--check-chat]`.
 - **Connectors** (`worker/connectors/`): Graph (app-only + delegated for chat
   sends), Dialpad, HCP (keys resolved from `public.office_configs` per
   territory), Jotform

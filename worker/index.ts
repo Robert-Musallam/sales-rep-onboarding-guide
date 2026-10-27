@@ -5,6 +5,7 @@ import { getHandler } from "./actions";
 import { sweepInfoFormReminders } from "./sweeps";
 import { watchGustoSignatures } from "./watchers";
 import { syncCompanyDirectory } from "./directory-sync";
+import { sweepGreetings } from "./greetings";
 import { alert } from "./alert";
 
 /**
@@ -72,6 +73,14 @@ async function pass(): Promise<void> {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("company directory sync failed:", msg);
     await alert("company directory sync failed", msg);
+  }
+  // Daily, self-gated: birthday and work-anniversary greetings in Teams.
+  try {
+    await sweepGreetings();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("greetings failed:", msg);
+    await alert("greetings failed", msg);
   }
   const { data: rows, error } = await db()
     .schema(ONBOARDING)
