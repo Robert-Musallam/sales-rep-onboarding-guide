@@ -32,6 +32,7 @@ export interface Rep {
   home_address: string | null;
   zip_code: string | null;
   dob: string | null;
+  expected_start: string | null;
   info: Record<string, unknown>;
   manager_name: string | null;
   territory_id: number | null;
@@ -845,7 +846,11 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     const digits = (rep.phone_e164 ?? "").replace(/\D/g, "").slice(-10);
     const phone: number | string = digits.length === 10 ? Number(digits) : (rep.phone_e164 ?? "");
     // Excel serial date (days since 1899-12-30), so the cell is a real date like its neighbours.
-    const dobSerial = rep.dob ? Math.round((Date.parse(rep.dob + "T00:00:00Z") - Date.UTC(1899, 11, 30)) / 86_400_000) : "";
+    const toSerial = (ymd: string) => Math.round((Date.parse(ymd + "T00:00:00Z") - Date.UTC(1899, 11, 30)) / 86_400_000);
+    const dobSerial = rep.dob ? toSerial(rep.dob) : "";
+    // Column G "Start Date" (added 2026-10-27): the start date the manager put on
+    // the intake form. Blank when the intake had none; ops fills it by hand.
+    const startSerial = rep.expected_start ? toSerial(rep.expected_start) : "";
     const values = [[
       "Design Consultant",
       `${rep.first_name} ${rep.last_name}`.trim(),
@@ -853,10 +858,11 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
       DIRECTORY_OFFICE[territory] ?? territory,
       rep.rnb_email,
       dobSerial,
+      startSerial,
     ]];
     await graph.excelInsertRows(driveId, itemId, worksheetId, `A${rowNo}:H${rowNo}`);
-    await graph.excelWriteRange(driveId, itemId, worksheetId, `A${rowNo}:F${rowNo}`, values, [
-      ["General", "General", "General", "General", "General", "d-mmm"],
+    await graph.excelWriteRange(driveId, itemId, worksheetId, `A${rowNo}:G${rowNo}`, values, [
+      ["General", "General", "General", "General", "General", "d-mmm", "m/d/yyyy"],
     ]);
     await logActivity(repId, "directory_added", `Added to the company directory under "${section}" (row ${rowNo})`);
     return { done: true, note: `row ${rowNo} under "${section}"` };

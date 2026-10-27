@@ -55,6 +55,16 @@ function birthday(cellText: unknown, cellValue: unknown): [number | null, number
   return [null, null];
 }
 
+/** Column G "Start Date": "m/d/yyyy" text or an Excel serial → YYYY-MM-DD. */
+function startDate(cellText: unknown, cellValue: unknown): string | null {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text(cellText));
+  if (m) return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  if (typeof cellValue === "number" && cellValue > 20000) {
+    return new Date(Date.UTC(1899, 11, 30) + cellValue * 86_400_000).toISOString().slice(0, 10);
+  }
+  return null;
+}
+
 /** Same key the first import used: category:section:name, lower-case, dashed, numbered on repeats. */
 function keyFor(seen: Map<string, number>, category: string, section: string, name: string): string {
   const base = `${category}:${section}:${name}`.toLowerCase().replace(/\s+/g, "-");
@@ -97,6 +107,7 @@ function parseMain(sheet: Sheet, active: boolean, order: { n: number }, seen: Ma
       email: emailOf(t[4]),
       birthday_month: bm,
       birthday_day: bd,
+      start_date: startDate(t[6], sheet.values[i]?.[6]),
       active,
       sort_order: (order.n += 10),
       source_key: keyFor(seen, "employee", block, name),
@@ -128,6 +139,7 @@ function parseList(
       email: emailOf(t[cols.email]),
       birthday_month: null,
       birthday_day: null,
+      start_date: null,
       active: true,
       sort_order: (order.n += 10),
       source_key: keyFor(seen, category, section, name),

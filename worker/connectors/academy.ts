@@ -36,6 +36,7 @@ export interface DirectoryRow {
   email: string | null;
   birthday_month: number | null;
   birthday_day: number | null;
+  start_date: string | null; // YYYY-MM-DD, from column G of the workbook
   active: boolean;
   sort_order: number;
   source_key: string;

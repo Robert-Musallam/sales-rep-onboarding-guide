@@ -40,7 +40,10 @@ the Jotform×3 + Make.com + Google Sheet chain.
   upserts Academy's `public.directory_people` (project `academy`, env
   `ACADEMY_SUPABASE_URL` / `ACADEMY_SUPABASE_SERVICE_ROLE_KEY` on the Mac).
   The workbook is the master; rows it no longer has are marked inactive, never
-  deleted. Last run: `app_settings.company_directory_synced_at`.
+  deleted. Last run: `app_settings.company_directory_synced_at`. Column G
+  "Start Date" (first filled by `scripts/directory_start_dates.ts` from
+  `employee_teams_chats.created_at`; the welcome writes the intake's start date
+  for new reps) mirrors to `start_date`.
 - **Connectors** (`worker/connectors/`): Graph (app-only + delegated for chat
   sends), Dialpad, HCP (keys resolved from `public.office_configs` per
   territory), Jotform
