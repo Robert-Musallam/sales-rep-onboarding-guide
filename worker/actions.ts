@@ -234,7 +234,7 @@ export async function contactInfo(rep: Rep): Promise<graph.ContactInfo> {
 /** "(702) 555-1234" for a 10-digit North American number; the raw value otherwise. */
 function phoneDisplay(e164: string | null): string {
   if (!e164) return "";
-  const d = e164.replace(/D/g, "").replace(/^1(?=d{10}$)/, "");
+  const d = e164.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
   return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : e164;
 }
 
