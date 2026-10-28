@@ -45,14 +45,14 @@ export interface Rep {
   hcp_employee_id: string | null;
   jotform_info_submission_id: string | null;
   is_test: boolean;
-  territory?: { name: string; post_sales_chat_ids: string[]; hcp_api_key_env: string | null } | null;
+  territory?: { name: string; post_sales_chat_ids: string[]; hcp_api_key_env: string | null; shipping_address: string | null } | null;
 }
 
 async function loadRep(repId: number): Promise<Rep> {
   const { data, error } = await db()
     .schema(ONBOARDING)
     .from("reps")
-    .select("*, territory:territories(name, post_sales_chat_ids, hcp_api_key_env)")
+    .select("*, territory:territories(name, post_sales_chat_ids, hcp_api_key_env, shipping_address)")
     .eq("id", repId)
     .maybeSingle();
   if (error) throw new Error(`loadRep: ${error.message}`);
@@ -231,6 +231,13 @@ export async function contactInfo(rep: Rep): Promise<graph.ContactInfo> {
   };
 }
 
+/** "(702) 555-1234" for a 10-digit North American number; the raw value otherwise. */
+function phoneDisplay(e164: string | null): string {
+  if (!e164) return "";
+  const d = e164.replace(/D/g, "").replace(/^1(?=d{10}$)/, "");
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : e164;
+}
+
 function repVars(rep: Rep): Record<string, string | null> {
   return {
     first_name: rep.first_name,
@@ -250,6 +257,10 @@ function repVars(rep: Rep): Record<string, string | null> {
     business_suffix: rep.contractor_type === "business" && rep.business_name ? ` — ${rep.business_name}` : "",
     rnb_email: rep.rnb_email,
     phone: rep.phone_e164,
+    phone_display: phoneDisplay(rep.phone_e164),
+    // Where the office receives mail (Settings → Territories); the business-card
+    // order names it.
+    shipping_address: rep.territory?.shipping_address ?? null,
     // The welcome email prints this. Falls back to the constant for reps
     // provisioned before it was stored, so the email is never blank.
     temp_password: rep.m365_temp_password ?? graph.TEMP_PASSWORD,
@@ -792,13 +803,21 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     return { done: true, note: `HCP ${found.id} · matched by ${found.matchedBy}` };
   },
 
-  /** Business-card request email to the configured contact. */
+  /**
+   * Business-card order to the configured contact, naming the office the cards
+   * ship to. Missing configuration is PERMANENT: retrying every few minutes
+   * cannot fill in an address — a person does, in Settings, then presses Retry.
+   */
   "email.business_cards": async (repId) => {
     const rep = await loadRep(repId);
     const contact = (await getSetting<string>("business_card_contact_email")) ?? "";
-    if (!contact) throw new Error("app_settings.business_card_contact_email is empty — set it in Settings");
-    const sender = (await getSetting<string>("welcome_email_sender")) ?? "";
-    if (!sender) throw new Error("app_settings.welcome_email_sender is empty");
+    if (!contact) throw new Error("PERMANENT: app_settings.business_card_contact_email is empty — set it in Settings");
+    const sender = (await getSetting<string>("business_card_sender_email")) ?? "";
+    if (!sender) throw new Error("PERMANENT: app_settings.business_card_sender_email is empty — set it in Settings");
+    if (!rep.territory) throw new Error("PERMANENT: the rep has no territory — pick one in the rep drawer");
+    if (!rep.territory.shipping_address) {
+      throw new Error(`PERMANENT: territory ${rep.territory.name} has no shipping address — set it in Settings → Territories, then Retry`);
+    }
     const verdict = gate("email", contact);
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${contact}` };
     const { subject, body } = await renderTemplate("email.business_cards", repVars(rep));
