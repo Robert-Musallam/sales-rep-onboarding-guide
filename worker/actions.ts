@@ -238,6 +238,13 @@ function phoneDisplay(e164: string | null): string {
   return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : e164;
 }
 
+/** "702.378.6521" for a 10-digit North American number; the raw value otherwise. */
+function phoneDots(e164: string | null): string {
+  if (!e164) return "";
+  const d = e164.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+  return d.length === 10 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}` : e164;
+}
+
 function repVars(rep: Rep): Record<string, string | null> {
   return {
     first_name: rep.first_name,
@@ -258,6 +265,8 @@ function repVars(rep: Rep): Record<string, string | null> {
     rnb_email: rep.rnb_email,
     phone: rep.phone_e164,
     phone_display: phoneDisplay(rep.phone_e164),
+    // "702.378.6521" — how the business card prints it.
+    phone_dots: phoneDots(rep.phone_e164),
     // Where the office receives mail (Settings → Territories); the business-card
     // order names it.
     shipping_address: rep.territory?.shipping_address ?? null,
@@ -818,6 +827,8 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     if (!rep.territory.shipping_address) {
       throw new Error(`PERMANENT: territory ${rep.territory.name} has no shipping address — set it in Settings → Territories, then Retry`);
     }
+    // The card prints the RNB address; it only exists once the Microsoft user does.
+    if (!rep.rnb_email) throw new Error("PERMANENT: the rep has no RNB email yet — assign the Microsoft licence first, then Retry");
     const verdict = gate("email", contact);
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${contact}` };
     const { subject, body } = await renderTemplate("email.business_cards", repVars(rep));
