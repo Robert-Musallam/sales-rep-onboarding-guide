@@ -821,8 +821,10 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     const verdict = gate("email", contact);
     if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would email ${contact}` };
     const { subject, body } = await renderTemplate("email.business_cards", repVars(rep));
-    await graph.sendMail({ fromUpn: sender, to: [contact], subject, html: body.replace(/\n/g, "<br>") });
-    await logActivity(repId, "business_cards_requested", `Business-card request → ${contact}`);
+    // Ops keeps a blind copy of every order (business_card_bcc, a JSON array).
+    const bcc = ((await getSetting<string[]>("business_card_bcc")) ?? []).filter(Boolean);
+    await graph.sendMail({ fromUpn: sender, to: [contact], bcc, subject, html: body.replace(/\n/g, "<br>") });
+    await logActivity(repId, "business_cards_requested", `Business-card request → ${contact}${bcc.length ? ` (bcc ${bcc.join(", ")})` : ""}`);
     return { done: true };
   },
 
