@@ -29,6 +29,7 @@ export interface Rep {
   phone_e164: string | null;
   phone_os: string | null;
   contractor_type: "individual" | "business" | null;
+  business_name: string | null;
   home_address: string | null;
   zip_code: string | null;
   dob: string | null;
@@ -244,6 +245,9 @@ function repVars(rep: Rep): Record<string, string | null> {
         : rep.contractor_type === "individual"
           ? "Individual (1099)"
           : "not answered",
+    business_name: rep.business_name,
+    // " — Acme Turf LLC" after the type in the ops notice; empty otherwise.
+    business_suffix: rep.contractor_type === "business" && rep.business_name ? ` — ${rep.business_name}` : "",
     rnb_email: rep.rnb_email,
     phone: rep.phone_e164,
     // The welcome email prints this. Falls back to the constant for reps
