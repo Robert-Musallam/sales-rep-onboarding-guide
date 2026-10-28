@@ -188,6 +188,12 @@ async function handleInfoForm(submissionId: string, raw: Record<string, unknown>
   const contractorRaw = contractorKey ? String(raw[contractorKey] ?? "") : "";
   if (/business/i.test(contractorRaw)) patch.contractor_type = "business";
   else if (/individual/i.test(contractorRaw)) patch.contractor_type = "individual";
+  // "Business name" (added 2026-10-28): shown by the form only for a business.
+  // Matched by field name like the type; cleared when the rep is not a business,
+  // so a stale name never survives a switch to Individual.
+  const businessKey = Object.keys(raw).find((k) => /business.?name/i.test(k));
+  const businessRaw = businessKey ? String(raw[businessKey] ?? "").trim() : "";
+  if (patch.contractor_type) patch.business_name = patch.contractor_type === "business" && businessRaw ? businessRaw : null;
 
   await supabase.schema("onboarding").from("reps").update(patch).eq("id", rep.id);
   await supabase.schema("onboarding").from("form_submissions").update({ rep_id: rep.id }).eq("submission_id", submissionId);
