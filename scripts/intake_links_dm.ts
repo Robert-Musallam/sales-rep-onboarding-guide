@@ -83,7 +83,7 @@ async function directoryName(upn: string): Promise<string | null> {
     const link = `${BASE}/intake/${l.data.token}`;
     const label = `New Design Consultant – ${city}`;
     console.log(`${city} → chat ${chatArg} (${firstName})${send ? " — SENDING" : " — dry run"}`);
-    console.log(`  message 1: ${instructions(firstName, city).replace(/<[^>]+>/g, " ").replace(/s+/g, " ").trim()}`);
+    console.log(`  message 1: ${instructions(firstName, city).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}`);
     console.log(`  message 2: [${label}] → ${link.slice(0, BASE.length + 20)}…  (pinned)`);
     if (send) {
       const m1 = await sendChatMessage(chatArg, instructions(firstName, city));
