@@ -1,6 +1,7 @@
 import { db, ONBOARDING, getSetting } from "./db";
 import * as graph from "./connectors/graph";
 import { academyConfigured, academyTenantId, retireMissing, upsertDirectory, type DirectoryRow } from "./connectors/academy";
+import { syncPeopleFromDirectory } from "./people-sync";
 
 /**
  * Company directory mirror (told 2026-10-26): the Excel workbook stays the
@@ -185,12 +186,14 @@ export async function syncCompanyDirectory(opts: { force?: boolean } = {}): Prom
   const stamp = new Date().toISOString();
   const written = await upsertDirectory(tenantId, rows, "excel_sync");
   const retired = await retireMissing(tenantId, rows.map((r) => r.source_key), `Not in the workbook as of ${stamp.slice(0, 10)}.`);
+  // Same rows, same hour: refresh Settings → People's email and phone from them.
+  const people = await syncPeopleFromDirectory(rows);
 
   await db()
     .schema(ONBOARDING)
     .from("app_settings")
     .upsert({ key: SETTING, value: stamp, updated_at: stamp }, { onConflict: "key" });
-  const receipt = `directory sync: ${rows.length} workbook rows → ${written} upserted, ${retired} retired`;
+  const receipt = `directory sync: ${rows.length} workbook rows → ${written} upserted, ${retired} retired; people: ${people.updated} updated, ${people.linked} newly linked${people.unmatched.length ? `, unmatched: ${people.unmatched.join(", ")}` : ""}`;
   console.log(receipt);
   return receipt;
 }
