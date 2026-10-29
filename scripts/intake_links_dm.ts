@@ -30,14 +30,26 @@ const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`
 const send = process.argv.includes("--send");
 const only = (arg("only") ?? "").toLowerCase();
 
+/**
+ * Teams chat HTML is a narrow subset: headings, <b>/<i>, lists, <a>, and
+ * inline color/font-size on <span>. Anything else is stripped on arrival, so
+ * the layout leans on those plus emoji.
+ */
+const GREEN = "#2E7D32";
+const NAVY = "#1F3A5F";
+
 function instructions(firstName: string, city: string): string {
   return [
-    `<p>Hi ${firstName},</p>`,
-    `<p>Here's your link to start onboarding a new Design Consultant for ${city}:</p>`,
-    `<p><b>How to use it</b><br>`,
-    `1. Open the link (no login needed).<br>`,
-    `2. Fill in the rep's name, cell phone, personal email, hiring manager and expected start date. The city is already set to ${city}.<br>`,
-    `3. Tap "Start onboarding".</p>`,
+    `<h2><span style="color:${GREEN}">🌿 New Design Consultant – ${city}</span></h2>`,
+    `<p>Hi ${firstName}, 👋</p>`,
+    `<p>Here's your link to start onboarding a new Design Consultant for <b>${city}</b>.</p>`,
+    `<p><span style="color:${NAVY}; font-size:16px"><b>📝 How to use it</b></span></p>`,
+    `<ol>`,
+    `<li>Open the link (no login needed). 🔗</li>`,
+    `<li>Fill in the rep's <b>name</b>, <b>cell phone</b>, <b>personal email</b>, <b>hiring manager</b> and <b>expected start date</b>. The city is already set to <b>${city}</b>. 🏙️</li>`,
+    `<li>Tap <b>"Start onboarding"</b>. ✅</li>`,
+    `</ol>`,
+    `<p><span style="color:${NAVY}"><b>📌 The link is pinned at the top of this chat</b></span> — same link every time you have a new rep.</p>`,
   ].join("");
 }
 
