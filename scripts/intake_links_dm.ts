@@ -87,7 +87,8 @@ async function directoryName(upn: string): Promise<string | null> {
     const label = `New Design Consultant – ${t.city}`;
     console.log(`  message 2: [${label}] → ${link.slice(0, BASE.length + 20)}…  (pinned)`);
     if (!send || !user) continue;
-    const chatId = await createOneOnOneChat(me.id, user.id);
+    // A test send to Robert himself goes to his own notes chat: Graph has no 1:1 chat with one member.
+    const chatId = user.id === me.id ? "48:notes" : await createOneOnOneChat(me.id, user.id);
     const m1 = await sendChatMessage(chatId, instructions(t.firstName, t.city));
     const m2 = await sendChatMessage(chatId, `<p><a href="${link}">${label}</a></p>`);
     await pinChatMessage(chatId, m2.id);
