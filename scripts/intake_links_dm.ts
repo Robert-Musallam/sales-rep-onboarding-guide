@@ -4,6 +4,8 @@
  *   npx tsx scripts/intake_links_dm.ts                 # dry run: resolves users, prints both messages, sends nothing
  *   npx tsx scripts/intake_links_dm.ts --send          # sends to every manager listed below
  *   npx tsx scripts/intake_links_dm.ts --send --only=cguzman@rocknblocklandscape.com
+ *   npx tsx scripts/intake_links_dm.ts --send --chat=<chatId> --city="Las Vegas" --name=Jose
+ *       (an EXISTING chat, e.g. with an external person Graph cannot create a chat with)
  *
  * Two messages per manager, on purpose: the instructions, then the link on
  * its own — shown as "New Design Consultant – <City>" with the real URL behind
@@ -71,6 +73,30 @@ async function directoryName(upn: string): Promise<string | null> {
 }
 
 (async () => {
+  const chatArg = arg("chat");
+  if (chatArg) {
+    const city = arg("city") ?? "";
+    const firstName = arg("name") ?? "";
+    if (!city || !firstName) throw new Error("--chat needs --city and --name");
+    const l = await db().schema(ONBOARDING).from("intake_links").select("token, territory:territories!inner(name)").eq("active", true).eq("territory.name", city).maybeSingle();
+    if (l.error || !l.data) throw new Error(`no active intake link for ${city}`);
+    const link = `${BASE}/intake/${l.data.token}`;
+    const label = `New Design Consultant – ${city}`;
+    console.log(`${city} → chat ${chatArg} (${firstName})${send ? " — SENDING" : " — dry run"}`);
+    console.log(`  message 1: ${instructions(firstName, city).replace(/<[^>]+>/g, " ").replace(/s+/g, " ").trim()}`);
+    console.log(`  message 2: [${label}] → ${link.slice(0, BASE.length + 20)}…  (pinned)`);
+    if (send) {
+      const m1 = await sendChatMessage(chatArg, instructions(firstName, city));
+      const m2 = await sendChatMessage(chatArg, `<p><a href="${link}">${label}</a></p>`);
+      try {
+        await pinChatMessage(chatArg, m2.id);
+        console.log(`  sent: messages ${m1.id}, ${m2.id} (pinned)`);
+      } catch (e) {
+        console.log(`  sent: messages ${m1.id}, ${m2.id}; PIN FAILED: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    return;
+  }
   const all = await targets();
   const list = all.filter((t) => (only ? t.upn === only : t.upn !== SELF));
   const skipped = all.filter((t) => !list.includes(t));
