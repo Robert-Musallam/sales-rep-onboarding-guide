@@ -5,8 +5,9 @@
  *   npx tsx scripts/intake_links_dm.ts --send          # sends to every manager listed below
  *   npx tsx scripts/intake_links_dm.ts --send --only=cguzman@rocknblocklandscape.com
  *
- * Two messages per manager, on purpose: the instructions, then the bare link
- * on its own so it can be pinned in the chat. Chats are 1:1 Robert ↔ manager
+ * Two messages per manager, on purpose: the instructions, then the link on
+ * its own — shown as "New Design Consultant – <City>" with the real URL behind
+ * it — which is then pinned in the chat so it stays at the top. Chats are 1:1 Robert ↔ manager
  * (find-or-create, app token); the messages are sent with the delegated token,
  * which is what Graph requires for chat messages — they come from Robert.
  *
@@ -16,7 +17,7 @@
  * skipped unless --only names him.
  */
 import { db, ONBOARDING } from "../worker/db";
-import { createOneOnOneChat, findUserByUpn, sendChatMessage } from "../worker/connectors/graph";
+import { createOneOnOneChat, findUserByUpn, pinChatMessage, sendChatMessage } from "../worker/connectors/graph";
 
 const BASE = "https://gcv-renewals.vercel.app";
 const SELF = "rmusallam@rocknblocklandscape.com";
@@ -83,12 +84,14 @@ async function directoryName(upn: string): Promise<string | null> {
     const link = `${BASE}/intake/${t.token}`;
     console.log(`\n${t.city}: ${t.firstName} ${t.lastName} <${t.upn}> ${user ? "✓ in Entra" : "✗ NOT FOUND in Entra"}`);
     console.log(`  message 1: ${instructions(t.firstName, t.city).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}`);
-    console.log(`  message 2: ${link.slice(0, BASE.length + 20)}…`);
+    const label = `New Design Consultant – ${t.city}`;
+    console.log(`  message 2: [${label}] → ${link.slice(0, BASE.length + 20)}…  (pinned)`);
     if (!send || !user) continue;
     const chatId = await createOneOnOneChat(me.id, user.id);
     const m1 = await sendChatMessage(chatId, instructions(t.firstName, t.city));
-    const m2 = await sendChatMessage(chatId, `<p><a href="${link}">${link}</a></p>`);
-    console.log(`  sent: chat ${chatId} messages ${m1.id}, ${m2.id}`);
+    const m2 = await sendChatMessage(chatId, `<p><a href="${link}">${label}</a></p>`);
+    await pinChatMessage(chatId, m2.id);
+    console.log(`  sent: chat ${chatId} messages ${m1.id}, ${m2.id} (pinned)`);
   }
 })().catch((e) => {
   console.error(e);
