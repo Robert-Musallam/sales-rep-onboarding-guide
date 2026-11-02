@@ -50,3 +50,6 @@ worker/.worker.lock
 
 # local credential prep (never commit)
 ops/manager-accounts.local.json
+
+# Playwright MCP run artifacts (page snapshots may contain personal data)
+.playwright-mcp/

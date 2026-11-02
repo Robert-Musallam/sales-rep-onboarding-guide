@@ -1,0 +1,8 @@
+{
+  "name": "gusto-agent",
+  "private": true,
+  "description": "Deterministic Gusto sign-in helper for the onboarding browser agent",
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

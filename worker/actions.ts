@@ -2,6 +2,7 @@ import { db, ONBOARDING, SHARED, getSetting, logActivity } from "./db";
 import { outboxRowsFor, STATUS_ON_COMPLETE } from "../lib/onboarding/automations";
 import { REP_STATUSES, type RepStatus } from "../modules/reps/types";
 import { gate } from "./env";
+import { gustoAddContractor } from "./gusto-agent";
 import { ENV } from "./env";
 import { renderTemplate } from "./templates";
 import { stateFromZip } from "./usState";
@@ -442,6 +443,8 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
    * earns its place for the reps whose box nobody ever ticks: it fires the same
    * bundle a manual click would, so the M365 user still gets created.
    */
+  "gusto.add_contractor": async (repId) => gustoAddContractor(repId),
+
   "rep.gusto_signed": async (repId, payload) => {
     const rep = await loadRep(repId);
     const result = await completeChecklistItem(repId, "gusto");

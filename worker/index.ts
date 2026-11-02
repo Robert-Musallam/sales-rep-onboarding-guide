@@ -4,6 +4,7 @@ import { db, ONBOARDING, logActivity } from "./db";
 import { getHandler } from "./actions";
 import { sweepInfoFormReminders } from "./sweeps";
 import { watchGustoSignatures } from "./watchers";
+import { sweepGustoAgent } from "./gusto-agent";
 import { syncCompanyDirectory } from "./directory-sync";
 import { sweepGreetings } from "./greetings";
 import { alert } from "./alert";
@@ -65,6 +66,11 @@ async function pass(): Promise<void> {
     await watchGustoSignatures();
   } catch (e) {
     console.error("gusto signature watch failed:", e instanceof Error ? e.message : String(e));
+  }
+  try {
+    await sweepGustoAgent();
+  } catch (e) {
+    console.error("gusto agent sweep failed:", e instanceof Error ? e.message : String(e));
   }
   // Hourly, self-gated: the company directory workbook → Academy's mirror table.
   try {

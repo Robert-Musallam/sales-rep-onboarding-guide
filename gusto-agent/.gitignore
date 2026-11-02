@@ -1,0 +1,6 @@
+logs/
+node_modules/
+.login-attempt
+.run.lock
+diag.command
+phase0-setup.command
