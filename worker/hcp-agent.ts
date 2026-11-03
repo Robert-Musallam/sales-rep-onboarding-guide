@@ -110,11 +110,20 @@ export async function hcpCreateUser(repId: number): Promise<{ done: true; note?:
   const r = rep as unknown as { id: number; first_name: string; last_name: string; rnb_email: string | null; phone_e164: string | null; hcp_agent_status: string | null; territory: { name: string; hcp_api_key_env: string | null } | null };
   if (r.hcp_agent_status !== "queued") return { skipped: true, note: `hcp_agent_status=${r.hcp_agent_status} (not queued)` };
 
-  // Duplicate check through the API (no browser needed).
-  const existing = await hcp.findEmployee({
-    apiKeyEnv: r.territory?.hcp_api_key_env, territoryName: r.territory?.name,
-    email: r.rnb_email, firstName: r.first_name, lastName: r.last_name,
-  });
+  // Duplicate check through the API (no browser needed). The territory keys in
+  // office_configs have answered 401 since 2026-08 — when the API refuses, fall back
+  // to the browser's own check on the territory's Team page (hcp-user.js, by name).
+  let existing: Awaited<ReturnType<typeof hcp.findEmployee>> = null;
+  let apiNote = "";
+  try {
+    existing = await hcp.findEmployee({
+      apiKeyEnv: r.territory?.hcp_api_key_env, territoryName: r.territory?.name,
+      email: r.rnb_email, firstName: r.first_name, lastName: r.last_name,
+    });
+  } catch (e) {
+    apiNote = `HCP API unavailable (${String((e as Error).message ?? e).slice(0, 80)}) — duplicate check done in the browser by name`;
+    await logActivity(repId, "hcp_agent_api_fallback", `HCP agent: ${apiNote}`);
+  }
   if (existing) {
     const note = `already in the ${r.territory?.name} HCP (employee ${existing.id}, matched by ${existing.matchedBy}) — no second user created; tick "Housecall Pro user created" to record it`;
     await db().schema(ONBOARDING).from("reps").update({ hcp_agent_status: "stopped", hcp_agent_note: note, hcp_agent_at: new Date().toISOString() }).eq("id", repId);
@@ -144,6 +153,6 @@ export async function hcpCreateUser(repId: number): Promise<{ done: true; note?:
 
   const gated = !v1.allowed ? v1.reason : !v2.allowed ? v2.reason : "";
   const mode = send ? "send" : `dry_run${wantSend && gated ? ` (send gated: ${gated})` : ""}`;
-  await logActivity(repId, "hcp_agent_started", `HCP agent: add-team-member run started (${mode})`);
+  await logActivity(repId, "hcp_agent_started", `HCP agent: add-team-member run started (${mode})${apiNote ? " · API fallback" : ""}`);
   return { done: true, note: `hcp-run.sh started (${mode})` };
 }
