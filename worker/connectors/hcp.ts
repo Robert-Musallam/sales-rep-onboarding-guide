@@ -87,3 +87,23 @@ export async function listEmployees(opts: {
   const j = (await res.json()) as { total_items?: number; employees?: unknown[] };
   return j.total_items ?? j.employees?.length ?? 0;
 }
+
+/** Team-member colors already used in a territory account (color_hex, lowercase). */
+export async function usedColors(opts: {
+  apiKeyEnv?: string | null;
+  territoryName?: string | null;
+}): Promise<string[]> {
+  const key = await resolveHcpKey(opts);
+  const out = new Set<string>();
+  for (let page = 1; page <= 5; page++) {
+    const res = await fetch(`${ENV.hcpBaseUrl()}/employees?page=${page}&page_size=100`, {
+      headers: { Authorization: `Token ${key}`, Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`hcp usedColors: ${res.status} ${await res.text()}`);
+    const j = (await res.json()) as { employees?: Array<{ color_hex?: string | null }> };
+    const list = j.employees ?? [];
+    for (const e of list) if (e.color_hex) out.add(e.color_hex.toLowerCase().replace(/^([^#])/, "#$1"));
+    if (list.length < 100) break;
+  }
+  return [...out];
+}

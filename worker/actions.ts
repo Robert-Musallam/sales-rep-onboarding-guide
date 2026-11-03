@@ -4,6 +4,7 @@ import { REP_STATUSES, type RepStatus } from "../modules/reps/types";
 import { gate } from "./env";
 import { gustoAddContractor } from "./gusto-agent";
 import { m365AssignLicense } from "./m365-agent";
+import { hcpCreateUser } from "./hcp-agent";
 import { alert } from "./alert";
 import { ENV } from "./env";
 import { renderTemplate } from "./templates";
@@ -446,6 +447,21 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
    * bundle a manual click would, so the M365 user still gets created.
    */
   "gusto.add_contractor": async (repId) => gustoAddContractor(repId),
+
+  /** HCP agent: start the add-team-member run on the Mac mini (worker/hcp-agent.ts). */
+  "hcp.create_user": async (repId) => hcpCreateUser(repId),
+
+  /** HCP agent saved the user → tick "Housecall Pro user created" (fires hcp.verify_employee). */
+  "hcp.check_user": async (repId) => {
+    const rep = await loadRep(repId);
+    const st = (rep as unknown as { hcp_agent_status?: string }).hcp_agent_status;
+    if (st !== "checking") return { skipped: true, note: `hcp_agent_status=${st} (not checking)` };
+    const result = await completeChecklistItem(repId, "hcp_user");
+    await updateRep(repId, { hcp_agent_status: "done", hcp_agent_at: new Date().toISOString() });
+    await logActivity(repId, "hcp_user_checked",
+      `HCP agent: ticked "Housecall Pro user created"${result.alreadyDone ? " (was already done)" : ` — ${result.enqueued} action(s) queued`}`);
+    return { done: true, note: result.alreadyDone ? "already done" : `${result.enqueued} queued` };
+  },
 
   /** M365 agent: start the license run on the Mac mini (worker/m365-agent.ts). */
   "m365.assign_license": async (repId) => m365AssignLicense(repId),

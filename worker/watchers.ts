@@ -66,7 +66,30 @@ interface RepRow {
   first_name: string;
   last_name: string;
   status: string;
+  business_name?: string | null;
   territory?: { name: string } | null;
+}
+
+const BIZ_SUFFIX = new Set(["llc", "pllc", "inc", "incorporated", "corp", "corporation", "co", "company", "ltd", "lp", "llp"]);
+
+/**
+ * Business names for comparison: unaccented, lowercase, punctuation dropped
+ * (not spaced, so "L.L.C." → "llc"), trailing entity suffixes removed. Reps who
+ * contract through an EIN finish Gusto under the business ("Koenig Sales
+ * Services LLC from Rock n block arizona can now be paid"), so the notice has
+ * no person's name in it at all.
+ */
+export function bizNorm(s: string | null | undefined): string {
+  const words = String(s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  while (words.length > 1 && BIZ_SUFFIX.has(words[words.length - 1])) words.pop();
+  return words.join(" ");
 }
 
 /** The rep this signature belongs to, or why it could not be pinned down. */
@@ -77,7 +100,18 @@ export function matchRep(
 ): { rep: RepRow | null; note: string } {
   const byName = reps.filter((r) => nameMatches(gustoName, r.first_name, r.last_name));
   if (byName.length === 1) return { rep: byName[0], note: "matched by name" };
-  if (byName.length === 0) return { rep: null, note: `no rep matches "${gustoName}"` };
+  if (byName.length === 0) {
+    // EIN contractors sign as their business — compare against reps.business_name.
+    const g = bizNorm(gustoName);
+    const byBiz = g ? reps.filter((r) => r.business_name && bizNorm(r.business_name) === g) : [];
+    if (byBiz.length === 1) return { rep: byBiz[0], note: "matched by business name" };
+    if (byBiz.length > 1) {
+      const t = byBiz.filter((r) => companyHints(company, r.territory?.name ?? null));
+      if (t.length === 1) return { rep: t[0], note: "matched by business name + company" };
+      return { rep: null, note: `business "${gustoName}" matches ${byBiz.length} reps (${byBiz.map((r) => r.id).join(", ")}) — ambiguous` };
+    }
+    return { rep: null, note: `no rep matches "${gustoName}" (by name or business name)` };
+  }
   const byTerritory = byName.filter((r) => companyHints(company, r.territory?.name ?? null));
   if (byTerritory.length === 1) return { rep: byTerritory[0], note: "matched by name + company" };
   return {
@@ -117,7 +151,7 @@ export async function watchGustoSignatures(): Promise<void> {
     const { data: reps, error } = await db()
       .schema(ONBOARDING)
       .from("reps")
-      .select("id, first_name, last_name, status, territory:territories(name)")
+      .select("id, first_name, last_name, status, business_name, territory:territories(name)")
       .neq("status", "inactive");
     if (error) throw new Error(`reps: ${error.message}`);
 

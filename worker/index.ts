@@ -6,6 +6,7 @@ import { sweepInfoFormReminders } from "./sweeps";
 import { watchGustoSignatures } from "./watchers";
 import { sweepGustoAgent } from "./gusto-agent";
 import { sweepM365Agent } from "./m365-agent";
+import { sweepHcpAgent } from "./hcp-agent";
 import { syncCompanyDirectory } from "./directory-sync";
 import { sweepGreetings } from "./greetings";
 import { alert } from "./alert";
@@ -77,6 +78,11 @@ async function pass(): Promise<void> {
     await sweepM365Agent();
   } catch (e) {
     console.error("m365 agent sweep failed:", e instanceof Error ? e.message : String(e));
+  }
+  try {
+    await sweepHcpAgent();
+  } catch (e) {
+    console.error("hcp agent sweep failed:", e instanceof Error ? e.message : String(e));
   }
   // Hourly, self-gated: the company directory workbook → Academy's mirror table.
   try {

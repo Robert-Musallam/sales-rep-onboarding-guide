@@ -15,3 +15,9 @@ m365-migrate.command
 m365-status.command
 m365-rearm38.command
 m365-push.command
+m365-golive.command
+sig-rematch.command
+open-gusto-hcp.command
+hcp-inspect.command
+hcp-migrate.command
+hcp-push.command

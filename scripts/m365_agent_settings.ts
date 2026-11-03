@@ -5,6 +5,7 @@
  *   npx tsx scripts/m365_agent_settings.ts --auto-welcome=false --send
  *   npx tsx scripts/m365_agent_settings.ts "--territories=Arizona,Tampa" --send
  *   npx tsx scripts/m365_agent_settings.ts --rearm=38 --send                  set one rep back to null (re-run)
+ *   npx tsx scripts/m365_agent_settings.ts --park=38 --send                   mark one rep 'legacy' (never picked up)
  * Writes only with --send.
  */
 import { db, ONBOARDING } from "../worker/db";
@@ -30,6 +31,13 @@ async function main() {
       await db().schema(ONBOARDING).from("outbox").delete().in("dedupe_key", [`m365.assign_license:${rearm}`, `m365.check_license:${rearm}`, `m365.auto_welcome:${rearm}`]);
       console.log(`re-armed rep ${rearm}`);
     } else console.log(`DRY RUN — would re-arm rep ${rearm}`);
+  }
+  const park = Number(arg("park") ?? 0);
+  if (park) {
+    if (send) {
+      await db().schema(ONBOARDING).from("reps").update({ m365_agent_status: "legacy", m365_agent_note: "parked by hand" }).eq("id", park);
+      console.log(`parked rep ${park}`);
+    } else console.log(`DRY RUN — would park rep ${park}`);
   }
   const { data } = await db().schema(ONBOARDING).from("app_settings").select("key, value").like("key", "m365_agent_%").order("key");
   for (const r of data ?? []) console.log(`${r.key} = ${JSON.stringify(r.value)}`);
