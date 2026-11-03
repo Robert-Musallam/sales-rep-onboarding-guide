@@ -17,7 +17,12 @@ export async function resolveHcpKey(opts: {
   apiKeyEnv?: string | null;
   territoryName?: string | null;
 }): Promise<string> {
-  if (opts.apiKeyEnv && process.env[opts.apiKeyEnv]) return process.env[opts.apiKeyEnv]!;
+  // office_configs stores the keys as "Token <key>" (the header value the sales-
+  // reporting scenarios paste in); every call here adds "Token " itself, so a
+  // stored prefix made the header "Token Token …" → 401 on every territory
+  // (2026-08 → 2026-11-03). Strip any stored scheme before returning.
+  const bare = (k: string) => k.trim().replace(/^(token|bearer)\s+/i, "").trim();
+  if (opts.apiKeyEnv && process.env[opts.apiKeyEnv]) return bare(process.env[opts.apiKeyEnv]!);
   if (opts.territoryName) {
     const { data } = await db()
       .from("office_configs")
@@ -25,9 +30,9 @@ export async function resolveHcpKey(opts: {
       .eq("location_name", opts.territoryName)
       .eq("is_active", true)
       .maybeSingle();
-    if (data?.hcp_api_key) return data.hcp_api_key as string;
+    if (data?.hcp_api_key) return bare(data.hcp_api_key as string);
   }
-  if (ENV.hcpDefaultApiKey()) return ENV.hcpDefaultApiKey();
+  if (ENV.hcpDefaultApiKey()) return bare(ENV.hcpDefaultApiKey());
   throw new Error(
     `No HCP API key for territory "${opts.territoryName ?? "?"}" — expected office_configs row, ` +
       `${opts.apiKeyEnv ?? "HCP_API_KEY"} env var, or Settings > Territories override`,
