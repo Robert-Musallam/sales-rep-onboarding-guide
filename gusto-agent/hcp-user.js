@@ -194,7 +194,9 @@ async function cancelPayment(p) {
     await openEmployees();
     await page.waitForTimeout(2000);
     const after = norm(await page.locator('body').innerText());
-    if (!after.includes(norm(`${first} ${last}`))) await out({ outcome: 'stopped', reason: 'saved_but_not_in_list', account }, 30);
+    // The Team list can render lazily, so a miss here is not proof of failure:
+    // report it as saved-but-unverified and let hcp-record.ts confirm by API (email).
+    if (!after.includes(norm(`${first} ${last}`))) await out({ outcome: 'saved_unverified', reason: 'not visible in the Team list right after saving', account, color }, 0);
     await out({ outcome: 'created', reason: null, account, color }, 0);
   } catch (e) {
     if (page && onLogin()) await out({ outcome: 'session', reason: 'hcp_sign_in_needed' }, 10);
