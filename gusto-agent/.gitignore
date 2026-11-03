@@ -4,3 +4,14 @@ node_modules/
 .run.lock
 diag.command
 phase0-setup.command
+m365-probe.command
+m365-conncheck.sh
+conncheck.command
+open-gusto-m365.command
+marker.html
+m365-dryrun.command
+m365-dom.command
+m365-migrate.command
+m365-status.command
+m365-rearm38.command
+m365-push.command

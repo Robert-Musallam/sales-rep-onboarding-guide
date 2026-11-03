@@ -3,6 +3,8 @@ import { outboxRowsFor, STATUS_ON_COMPLETE } from "../lib/onboarding/automations
 import { REP_STATUSES, type RepStatus } from "../modules/reps/types";
 import { gate } from "./env";
 import { gustoAddContractor } from "./gusto-agent";
+import { m365AssignLicense } from "./m365-agent";
+import { alert } from "./alert";
 import { ENV } from "./env";
 import { renderTemplate } from "./templates";
 import { stateFromZip } from "./usState";
@@ -444,6 +446,73 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
    * bundle a manual click would, so the M365 user still gets created.
    */
   "gusto.add_contractor": async (repId) => gustoAddContractor(repId),
+
+  /** M365 agent: start the license run on the Mac mini (worker/m365-agent.ts). */
+  "m365.assign_license": async (repId) => m365AssignLicense(repId),
+
+  /**
+   * M365 agent saved the license → tick "Microsoft license assigned" exactly as a
+   * manager click would (license_done bundle: Teams DM, Phone Room, territory
+   * chats, app SMS, Team channels autocomplete; card → Provisioning). Then queue
+   * the automatic welcome when m365_agent_auto_welcome is on.
+   */
+  "m365.check_license": async (repId) => {
+    const rep = await loadRep(repId);
+    const st = (rep as unknown as { m365_agent_status?: string }).m365_agent_status;
+    if (st !== "checking") return { skipped: true, note: `m365_agent_status=${st} (not checking)` };
+    const result = await completeChecklistItem(repId, "m365_license");
+    const autoWelcome = (await getSetting<boolean>("m365_agent_auto_welcome", false)) === true;
+    await updateRep(repId, {
+      m365_agent_status: autoWelcome ? "license_checked" : "done",
+      m365_agent_at: new Date().toISOString(),
+    });
+    if (autoWelcome) {
+      const { error } = await db().schema(ONBOARDING).from("outbox").upsert(
+        { action_type: "m365.auto_welcome", rep_id: repId, payload: {}, dedupe_key: `m365.auto_welcome:${repId}`,
+          run_after: new Date(Date.now() + 6 * 60_000).toISOString() },
+        { onConflict: "dedupe_key", ignoreDuplicates: true },
+      );
+      if (error) throw new Error(`outbox: ${error.message}`);
+    }
+    await logActivity(repId, "m365_license_checked",
+      `M365 agent: ticked "Microsoft license assigned"${result.alreadyDone ? " (was already done)" : ` — ${result.enqueued} action(s) queued`}${autoWelcome ? "; welcome queued after Teams setup" : ""}`);
+    return { done: true, note: result.alreadyDone ? "already done" : `${result.enqueued} queued` };
+  },
+
+  /**
+   * Automatic welcome (m365_agent_auto_welcome): once the license bundle has
+   * finished — every license_done row done and Team channels ticked — tick
+   * "Welcome message sent" (welcome_done bundle: company chat, company-wide
+   * announcement, welcome email, directory; card → Active). email.welcome waits
+   * for the mailbox on its own. A failed Teams step stops here and alerts.
+   */
+  "m365.auto_welcome": async (repId) => {
+    if ((await getSetting<boolean>("m365_agent_auto_welcome", false)) !== true) {
+      return { skipped: true, note: "m365_agent_auto_welcome is off" };
+    }
+    const rep = await loadRep(repId);
+    const { data: rows, error } = await db().schema(ONBOARDING).from("outbox")
+      .select("action_type, state").like("dedupe_key", `license_done:%:${repId}`);
+    if (error) throw new Error(`outbox: ${error.message}`);
+    const failed = (rows ?? []).filter((r) => r.state === "failed").map((r) => r.action_type);
+    if (failed.length) {
+      await updateRep(repId, { m365_agent_status: "stopped", m365_agent_note: `welcome held: Teams setup failed (${failed.join(", ")})` });
+      await alert("M365 agent: welcome held", `${rep.first_name} ${rep.last_name}: Teams setup failed (${failed.join(", ")}). Fix it, then tick "Welcome message sent" by hand.`);
+      return { skipped: true, note: `license bundle failed: ${failed.join(", ")}` };
+    }
+    const open = (rows ?? []).filter((r) => r.state !== "done" && r.state !== "skipped");
+    if (!rows?.length || open.length) {
+      throw new Error(`WAIT: Teams setup still running (${open.map((r) => r.action_type).join(", ") || "no license rows yet"})`);
+    }
+    const { data: tc } = await db().schema(ONBOARDING).from("checklist_items")
+      .select("status").eq("rep_id", repId).eq("template_key", "team_channel").maybeSingle();
+    if (tc && tc.status !== "done") throw new Error("WAIT: Team channels not ticked yet");
+    const result = await completeChecklistItem(repId, "welcome_message");
+    await updateRep(repId, { m365_agent_status: "done", m365_agent_at: new Date().toISOString() });
+    await logActivity(repId, "m365_welcome_checked",
+      `M365 agent: ticked "Welcome message sent"${result.alreadyDone ? " (was already done)" : ` — ${result.enqueued} action(s) queued`}`);
+    return { done: true, note: result.alreadyDone ? "already done" : `${result.enqueued} queued` };
+  },
 
   "rep.gusto_signed": async (repId, payload) => {
     const rep = await loadRep(repId);

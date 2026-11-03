@@ -10,7 +10,7 @@
 # Usage:
 #   chrome-gusto.sh start            launch for an agent run (refuses under memory
 #                                    pressure or while an AppFolio :9222 chain runs)
-#   chrome-gusto.sh signin           attended: launch with Gusto + Holding OS open so
+#   chrome-gusto.sh signin           attended: launch with Gusto + Holding OS + M365 admin open so
 #                                    Robert can sign in / enter the SMS code
 #   chrome-gusto.sh stop             quit this profile's Chrome only
 #   chrome-gusto.sh status           print state, never changes anything
@@ -100,7 +100,7 @@ case "$cmd" in
   signin)
     guard_port
     if [ -n "$(browser_pids)" ]; then log "already running — use the open window"; exit 0; fi
-    launch "chrome://settings/onStartup" "https://app.gusto.com/login" "https://gcv-renewals.vercel.app/rnb/reps"
+    launch "chrome://settings/onStartup" "https://app.gusto.com/login" "https://gcv-renewals.vercel.app/rnb/reps" "https://admin.cloud.microsoft/#/users"
     echo "In the window that opened:"
     echo "  1. Settings tab: On start-up -> Continue where you left off (keeps the Gusto login across restarts)"
     echo "  2. Gusto tab: sign in, enter the SMS code, tick Remember this device"
