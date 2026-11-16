@@ -31,9 +31,10 @@ fi
 if [ $WAS_RUNNING -eq 1 ]; then
   trap 'rm -f "$LOCK"' EXIT
 else
-  trap 'bash "$HERE/chrome-gusto.sh" stop >/dev/null 2>&1; rm -f "$LOCK"' EXIT
+  trap 'rm -f "$LOCK"' EXIT
 fi
 
+node "$HERE/tidy-tabs.js" 2>>"$HERE/logs/tidy-tabs.log"
 node "$HERE/hcp-user.js" "$REP_JSON" $SEND_FLAG > "$OUT" 2>>"$HERE/logs/hcp-user.log"
 lrc=$?
 echo "hcp-user exit $lrc -> $OUT"

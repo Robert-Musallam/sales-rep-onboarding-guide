@@ -31,9 +31,10 @@ fi
 if [ $WAS_RUNNING -eq 1 ]; then
   trap 'rm -f "$LOCK"' EXIT
 else
-  trap 'bash "$HERE/chrome-gusto.sh" stop >/dev/null 2>&1; rm -f "$LOCK"' EXIT
+  trap 'rm -f "$LOCK"' EXIT
 fi
 
+node "$HERE/tidy-tabs.js" 2>>"$HERE/logs/tidy-tabs.log"
 node "$HERE/m365-license.js" "$REP_JSON" $SEND_FLAG > "$OUT" 2>>"$HERE/logs/m365-license.log"
 lrc=$?
 echo "m365-license exit $lrc -> $OUT"

@@ -31,8 +31,9 @@ if [ $rc -ne 0 ]; then
   record; rm -f "$LOCK"
   exit $rc
 fi
-trap 'bash "$HERE/chrome-gusto.sh" stop >/dev/null 2>&1; rm -f "$LOCK"' EXIT
+trap 'rm -f "$LOCK"' EXIT
 
+node "$HERE/tidy-tabs.js" 2>>"$HERE/logs/tidy-tabs.log"
 node "$HERE/login.js" 2>>"$HERE/logs/login.log"
 lrc=$?
 if [ $lrc -ne 0 ]; then

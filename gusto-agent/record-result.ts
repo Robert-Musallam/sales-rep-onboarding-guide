@@ -6,9 +6,11 @@
  *
  *   npx tsx gusto-agent/record-result.ts <rep_id> <dry_run|send> <out.json>
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { db, ONBOARDING, logActivity } from "../worker/db";
 import { alert } from "../worker/alert";
+import { notifyRobert } from "../worker/notify";
 
 type SkillResult = {
   outcome?: string; stop_reason?: string | null; gusto_company?: string | null;
@@ -51,6 +53,24 @@ async function main() {
   if (raw.outcome === "deferred") return requeue(repId, `deferred (launcher exit ${raw.launcher_exit})`, 5);
   if (raw.outcome === "session") {
     const code = Number(raw.login_exit);
+    if (code === 10) {
+      // login.js marks .code-requested ("new" or "remind") when it texted a code / it is time
+      // to remind; message Robert once per mark, then clear the mark.
+      const mark = path.join(__dirname, ".code-requested");
+      try {
+        const age = Date.now() - statSync(mark).mtimeMs;
+        const kind = readFileSync(mark, "utf8").trim();
+        if (age < 10 * 60_000 && (kind === "new" || kind === "remind")) {
+          const sent = await notifyRobert(
+            kind === "new"
+              ? `Gusto agent: Gusto just texted you a code. Enter it in the Gusto Chrome window on the Mac mini (tick "Remember this device"). ${who} is waiting to be added.`
+              : `Gusto agent: still waiting for the Gusto code in the Gusto Chrome window on the Mac mini. ${who} is waiting to be added.`,
+          );
+          await logActivity(repId, "gusto_agent_notify", `Gusto agent: ${sent}`);
+          writeFileSync(mark, "sent");
+        }
+      } catch { /* no mark */ }
+    }
     if (RETRY_LOGIN.has(code)) return requeue(repId, `Gusto sign-in waiting (login exit ${code})`);
     await db().schema(ONBOARDING).from("reps").update({ gusto_agent_status: "stopped", gusto_agent_note: `sign-in failed (login exit ${code})` }).eq("id", repId);
     await db().schema(ONBOARDING).from("gusto_agent_runs").insert({ rep_id: repId, mode, outcome: "session", stop_reason: `login_exit_${code}`, result: raw });
