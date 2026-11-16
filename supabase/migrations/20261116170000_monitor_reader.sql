@@ -29,17 +29,25 @@ grant select on shared.entity_activity to monitor_reader;
 grant select (id, first_name, last_name, is_test) on onboarding.reps to monitor_reader;
 grant select (key, value, updated_at) on onboarding.app_settings to monitor_reader;
 
-drop policy if exists monitor_reader_agent_activity on shared.entity_activity;
-create policy monitor_reader_agent_activity on shared.entity_activity
-  for select to monitor_reader
-  using (entity_type = 'rep'
-         and action ~ '^(gusto_agent|m365_agent|hcp_agent)_|^m365_user_created$');
-
-drop policy if exists monitor_reader_reps on onboarding.reps;
-create policy monitor_reader_reps on onboarding.reps
-  for select to monitor_reader using (true);
-
-drop policy if exists monitor_reader_agent_settings on onboarding.app_settings;
-create policy monitor_reader_agent_settings on onboarding.app_settings
-  for select to monitor_reader
-  using (key ~ '^(gusto|m365|hcp)_agent_(heartbeat|enabled)$');
+-- Policies are created only when missing (no DROP), so the script can be re-run safely.
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'shared' and tablename = 'entity_activity'
+                 and policyname = 'monitor_reader_agent_activity') then
+    create policy monitor_reader_agent_activity on shared.entity_activity
+      for select to monitor_reader
+      using (entity_type = 'rep'
+             and action ~ '^(gusto_agent|m365_agent|hcp_agent)_|^m365_user_created$');
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'onboarding' and tablename = 'reps'
+                 and policyname = 'monitor_reader_reps') then
+    create policy monitor_reader_reps on onboarding.reps
+      for select to monitor_reader using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'onboarding' and tablename = 'app_settings'
+                 and policyname = 'monitor_reader_agent_settings') then
+    create policy monitor_reader_agent_settings on onboarding.app_settings
+      for select to monitor_reader
+      using (key ~ '^(gusto|m365|hcp)_agent_(heartbeat|enabled)$');
+  end if;
+end $$;
