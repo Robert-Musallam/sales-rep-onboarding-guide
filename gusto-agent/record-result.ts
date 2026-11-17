@@ -11,6 +11,10 @@ import path from "node:path";
 import { db, ONBOARDING, logActivity } from "../worker/db";
 import { alert } from "../worker/alert";
 import { notifyRobert } from "../worker/notify";
+import { completeChecklistItem } from "../worker/checklist";
+
+// "Already there" stops that still mean the rep is in Gusto (invited or onboarded).
+const IN_GUSTO_STOP = /^already_in_gusto:(Onboarding|Active)\b/i;
 
 type SkillResult = {
   outcome?: string; stop_reason?: string | null; gusto_company?: string | null;
@@ -106,6 +110,19 @@ async function main() {
     documents: result?.documents ?? [], cost_usd: cost, duration_ms: duration, result: result ?? { raw_subtype: raw.subtype ?? null },
   });
   await logActivity(repId, `gusto_agent_${status}`, `Gusto agent (${mode}): ${status} — ${note}`.slice(0, 300));
+
+  // The rep is in Gusto — added by this run, or already there from an earlier
+  // invite. That is the fact "Gusto: rep added + contract sent" records, so tick
+  // it the way the drawer does: it fires m365.create_user and moves the card to
+  // contract_sent. The signature mail (watchers.ts) still owns contract_signed.
+  // Rep 39 sat for two days because nothing ticked it after an already_in_gusto stop.
+  const inGusto = status === "added" || (status === "stopped" && IN_GUSTO_STOP.test(note));
+  if (mode === "send" && inGusto) {
+    const r = await completeChecklistItem(repId, "gusto");
+    await logActivity(repId, "gusto_item_checked",
+      `Gusto agent: ticked "Gusto: rep added + contract sent"${r.alreadyDone ? " (was already done)" : ` — ${r.enqueued} action(s) queued`}`);
+  }
+
   if (status !== "added" && status !== "dry_run_ok") {
     await alert(`Gusto agent: ${status}`, `${who}: ${note}`);
   }

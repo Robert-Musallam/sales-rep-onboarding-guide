@@ -55,10 +55,17 @@ async function licenseRows() {
   try {
     await page.goto('https://admin.cloud.microsoft/#/users', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
-    if (onLogin(page.url())) await out({ outcome: 'session', reason: 'microsoft_sign_in_needed' }, 10);
+    // A cold load goes through a silent SSO hop on login.microsoftonline.com and
+    // comes back on its own; only a page that stays there needs a human sign-in.
+    // 2026-11-17: the 4 s check plus a 45 s search wait timed out on that hop.
+    if (onLogin(page.url())) {
+      note('on Microsoft sign-in, waiting for the SSO redirect');
+      await page.waitForURL((u) => !onLogin(String(u)), { timeout: 60000 }).catch(() => {});
+      if (onLogin(page.url())) await out({ outcome: 'session', reason: 'microsoft_sign_in_needed' }, 10);
+    }
 
     const search = page.getByRole('searchbox').first();
-    await search.waitFor({ state: 'visible', timeout: 45000 });
+    await search.waitFor({ state: 'visible', timeout: 90000 });
     await search.fill(upn.split('@')[0]);
     await search.press('Enter');
     note(`searched ${upn.split('@')[0]}`);
@@ -115,6 +122,12 @@ async function licenseRows() {
     if (!checkedAfter.includes(BASIC)) await out({ outcome: 'stopped', reason: 'saved_but_basic_not_checked', licenses_after: checkedAfter }, 30);
     await out({ outcome: 'licensed', reason: null, available: after.find((r) => r.name === BASIC)?.avail, licenses_before: checkedBefore, licenses_after: checkedAfter }, 0);
   } catch (e) {
+    // Keep what the page showed, so the next timeout can be read instead of guessed.
+    try {
+      const shot = require('path').join(__dirname, 'logs', `m365-fail-${new Date().toISOString().replace(/[:.]/g, '-')}.png`);
+      await page.screenshot({ path: shot, timeout: 10000 });
+      note(`screenshot ${shot} · url ${page.url().slice(0, 120)}`);
+    } catch {}
     if (page && onLogin(page.url())) await out({ outcome: 'session', reason: 'microsoft_sign_in_needed' }, 10);
     await out({ outcome: 'stopped', reason: `unexpected: ${String(e.message || e).split('\n')[0].slice(0, 200)}` }, 30);
   }
