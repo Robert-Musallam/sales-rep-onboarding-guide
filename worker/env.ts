@@ -38,6 +38,8 @@ export const ENV = {
   // optional: unset means the mirror is off (worker/directory-sync.ts).
   academySupabaseUrl: () => process.env.ACADEMY_SUPABASE_URL ?? "",
   academyServiceRoleKey: () => process.env.ACADEMY_SUPABASE_SERVICE_ROLE_KEY ?? "",
+  /** RNB Academy roster API bearer token (docs/academy-roster-api.md). Unset = Academy step off. */
+  academyRosterToken: () => process.env.ACADEMY_ROSTER_TOKEN ?? "",
 };
 
 /**

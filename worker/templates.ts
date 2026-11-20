@@ -24,3 +24,8 @@ export async function renderTemplate(
   }
   return { subject: render(t.subject ?? "", vars), body: render(body, vars) };
 }
+
+/** Render a file in worker/templates/ directly (partials such as the welcome's Academy section). */
+export function renderFileTemplate(name: string, vars: Record<string, string | null | undefined>): string {
+  return render(readFileSync(path.join(__dirname, "templates", name), "utf8"), vars);
+}

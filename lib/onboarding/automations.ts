@@ -52,6 +52,9 @@ export const AUTOMATION_BUNDLES: Record<string, ActionSpec[]> = {
   // No stagger needed — the worker now drains same-run_after rows in declared
   // order, and teams.company_announcement re-asserts the membership anyway.
   welcome_done: [
+    // Academy user first: the welcome email gives the rep that login, so it waits
+    // for this row to settle (email.welcome in worker/actions.ts).
+    { actionType: "academy.create_user" },
     { actionType: "teams.join_company_chat" },
     { actionType: "teams.company_announcement" },
     { actionType: "email.welcome" },
