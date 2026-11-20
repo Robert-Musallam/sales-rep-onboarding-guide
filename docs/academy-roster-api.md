@@ -27,8 +27,8 @@ readable is compromised and must be rotated.
 
 | Field | Type | Example | Notes |
 |---|---|---|---|
-| `email` | string | `newrep@example.com` | The rep's email; becomes their Academy login. |
-| `password` | string | `<TEMP_PASSWORD>` | Temporary password. Generate one per rep; the rep should change it. Never reuse a fixed password. |
+| `email` | string | `jdoe@rocknblocklandscape.com` | **The rep's new Microsoft 365 email** (`reps.rnb_email`, created by `m365.create_user`). Becomes their Academy login. Not the personal email. |
+| `password` | string | `<TEMP_PASSWORD>` | **Always the same temporary password as the rep's Microsoft user**: `rep.m365_temp_password ?? graph.TEMP_PASSWORD` (`worker/connectors/graph.ts`). Decided 2026-11-20. The rep should change it at first sign-in. |
 | `role` | string | `trainee` | New reps start as `trainee`. |
 | `company` | string | `rnb` | |
 | `track` | string | `sales-design-consultant` | Training track for sales reps. |
@@ -41,7 +41,7 @@ curl --location 'https://www.rocknblockacademy.com/api/roster' \
   --header "Authorization: Bearer $ACADEMY_ROSTER_TOKEN" \
   --header 'Content-Type: application/json' \
   --data-raw '{
-    "email":    "newrep@example.com",
+    "email":    "jdoe@rocknblocklandscape.com",
     "password": "<TEMP_PASSWORD>",
     "role":     "trainee",
     "company":  "rnb",
@@ -57,7 +57,7 @@ curl --location 'https://www.rocknblockacademy.com/api/roster' \
   "created": true,
   "id": "<uuid — roster row id>",
   "user_id": "<uuid — Academy auth user id>",
-  "email": "newrep@example.com",
+  "email": "jdoe@rocknblocklandscape.com",
   "role": "trainee",
   "company": "rnb"
 }
@@ -67,10 +67,16 @@ curl --location 'https://www.rocknblockacademy.com/api/roster' \
 - `user_id`: the rep's Academy auth user. Store it on the rep record (for
   example a future `reps.academy_user_id`) so a second call is not needed.
 
+## When to call it
+
+After the rep's Microsoft user exists (`reps.rnb_email` is set), because that
+email is the Academy login. Same temporary password as Microsoft, so the rep has
+one password to change for both.
+
 ## Open questions (confirm with the Academy owner before automating)
 
 - What happens when the email already exists: error, or `created: false` with the existing ids?
 - Error format and status codes (bad token, missing field, invalid track).
 - Allowed values for `role`, `track` and `manager` (is `manager` an email, a user id?).
 - Does Academy email the rep, or must we send the login and temporary password ourselves?
-- Can the rep be forced to change the temporary password on first sign-in?
+- Can Academy force the rep to change the temporary password on first sign-in? Recommended: every rep starts with the same known password.
