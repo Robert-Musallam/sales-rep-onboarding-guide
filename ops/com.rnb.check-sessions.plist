@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.rnb.check-sessions</string>
+
+  <!-- Daily read-only check that the agents' Chrome (~/chrome-gusto, :9336) is
+       still signed in to Gusto, M365, Holding OS and Housecall Pro. Alerts only
+       when something is wrong. perl alarm = external kill after 10 min, so a hung
+       check can never block the next day's run. Installed by ops/install_check_sessions.sh. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd __REPO__ &amp;&amp; perl -e 'alarm 600; exec @ARGV' npx tsx gusto-agent/check-sessions.ts >> gusto-agent/logs/check-sessions.log 2>&amp;1</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>8</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>
