@@ -44,6 +44,9 @@ the Jotform×3 + Make.com + Google Sheet chain.
   "Start Date" (first filled by `scripts/directory_start_dates.ts` from
   `employee_teams_chats.created_at`; the welcome writes the intake's start date
   for new reps) mirrors to `start_date`.
+- **RNB Academy user** (not automated yet): new reps get an Academy login
+  through the roster API, `POST https://www.rocknblockacademy.com/api/roster`.
+  See [docs/academy-roster-api.md](docs/academy-roster-api.md).
 - **Birthday / anniversary greetings** (`worker/greetings.ts`): once a day after
   `greetings_hour` local time (`greetings_timezone`), the worker reads the
   mirror and posts one Teams message per person per kind into
