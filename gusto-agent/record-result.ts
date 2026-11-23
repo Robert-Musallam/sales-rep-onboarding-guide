@@ -123,6 +123,27 @@ async function main() {
       `Gusto agent: ticked "Gusto: rep added + contract sent"${r.alreadyDone ? " (was already done)" : ` — ${r.enqueued} action(s) queued`}`);
   }
 
+  // Already ACTIVE in Gusto = onboarding finished, contract signed. The
+  // "can now be paid" mail that normally carries that news was sent long ago
+  // (or never reaches us), so nothing would move the card to contract_signed
+  // and the M365 license agent would never pick the rep up (test rep 40,
+  // 2026-11-23). Queue the same rep.gusto_signed action the mailbox watcher
+  // uses: forward-only stage move + the usual ops text. "Onboarding" (invited,
+  // not signed) still waits for the mail.
+  if (mode === "send" && status === "stopped" && /^already_in_gusto:Active\b/i.test(note)) {
+    const { error } = await db().schema(ONBOARDING).from("outbox").upsert(
+      [{
+        action_type: "rep.gusto_signed",
+        rep_id: repId,
+        payload: { source: "gusto_agent_already_active", gusto_company: result?.gusto_company ?? null },
+        dedupe_key: `gusto_signed:agent_active:${repId}`,
+      }],
+      { onConflict: "dedupe_key", ignoreDuplicates: true },
+    );
+    if (error) throw new Error(`outbox: ${error.message}`);
+    await logActivity(repId, "gusto_already_active", "Gusto agent: rep is already Active in Gusto — treated as contract signed (rep.gusto_signed queued)");
+  }
+
   if (status !== "added" && status !== "dry_run_ok") {
     await alert(`Gusto agent: ${status}`, `${who}: ${note}`);
   }
