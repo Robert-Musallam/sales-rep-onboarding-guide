@@ -6,7 +6,8 @@ import { m365AssignLicense } from "./m365-agent";
 import { hcpCreateUser } from "./hcp-agent";
 import { alert } from "./alert";
 import { ENV } from "./env";
-import { renderTemplate } from "./templates";
+import { renderTemplate, renderFileTemplate } from "./templates";
+import * as academyRoster from "./connectors/academy-roster";
 import { stateFromZip } from "./usState";
 import * as graph from "./connectors/graph";
 import * as dialpad from "./connectors/dialpad";
@@ -66,6 +67,24 @@ async function loadRep(repId: number): Promise<Rep> {
 async function updateRep(repId: number, patch: Record<string, unknown>) {
   const { error } = await db().schema(ONBOARDING).from("reps").update(patch).eq("id", repId);
   if (error) throw new Error(`updateRep: ${error.message}`);
+}
+
+/**
+ * Has this rep's RNB Academy user been created? Read from the activity log
+ * (academy_user_created carries the ids) and the academy.create_user outbox row.
+ *   created  — the user exists
+ *   pending  — the row is still queued / in flight / retrying: the welcome waits
+ *   off      — no row, skipped (token not set, gate) or failed: send without the section
+ */
+async function academyStatus(repId: number): Promise<"created" | "pending" | "off"> {
+  const { data: act } = await db().schema(SHARED).from("entity_activity")
+    .select("action").eq("entity_type", "rep").eq("entity_id", String(repId)).eq("action", "academy_user_created").limit(1);
+  if (act?.length) return "created";
+  const { data: row } = await db().schema(ONBOARDING).from("outbox")
+    .select("state").eq("rep_id", repId).eq("action_type", "academy.create_user")
+    .order("id", { ascending: false }).limit(1).maybeSingle();
+  if (!row) return "off";
+  return row.state === "pending" || row.state === "in_flight" ? "pending" : "off";
 }
 
 /** Trim, drop blanks, and collapse case-insensitive duplicates. */
@@ -577,6 +596,42 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     return { done: true };
   },
 
+  /**
+   * RNB Academy user (docs/academy-roster-api.md). First action of the
+   * welcome_done bundle, so it lands before email.welcome, which waits for it.
+   * Login = the rep's Microsoft email, password = the same temporary password
+   * as Microsoft (decided 2026-11-20). No ACADEMY_ROSTER_TOKEN = the step is off:
+   * skipped with an alert, and the welcome goes out without the Academy section.
+   */
+  "academy.create_user": async (repId) => {
+    const rep = await loadRep(repId);
+    if (!rep.rnb_email) throw new Error("rep has no rnb_email yet (create the Microsoft user first)");
+    // Idempotent: a retry after a success must not create a second Academy user.
+    const { data: done } = await db().schema(SHARED).from("entity_activity")
+      .select("action").eq("entity_type", "rep").eq("entity_id", String(repId)).eq("action", "academy_user_created").limit(1);
+    if (done?.length) return { done: true, note: "Academy user already created" };
+    if (!ENV.academyRosterToken()) {
+      await alert("Academy user not created", `${rep.first_name} ${rep.last_name}: ACADEMY_ROSTER_TOKEN is not set in .env.local on the Mac mini. The welcome email goes out without the Academy section.`);
+      return { skipped: true, note: "ACADEMY_ROSTER_TOKEN not set — Academy step off" };
+    }
+    const verdict = gate("provision");
+    if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would create Academy user ${rep.rnb_email}` };
+    const r = await academyRoster.createRosterUser({
+      email: rep.rnb_email,
+      password: rep.m365_temp_password ?? graph.TEMP_PASSWORD,
+      role: "trainee",
+      company: "rnb",
+      track: "sales-design-consultant",
+      manager: null,
+    });
+    await logActivity(repId, "academy_user_created", `RNB Academy user created for ${r.email ?? rep.rnb_email}${r.created === false ? " (already existed)" : ""}`, {
+      academy_user_id: r.user_id,
+      academy_roster_id: r.id,
+      created: r.created,
+    });
+    return { done: true, note: `Academy user ${r.user_id}` };
+  },
+
   /** Gusto checked → create the Microsoft user (replaces Make's addAMember w/ static password). */
   "m365.create_user": async (repId) => {
     const rep = await loadRep(repId);
@@ -767,9 +822,15 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     // settings so the contact can change without editing the template.
     const supportEmail =
       (await getSetting<string>("support_contact_email")) ?? "rmusallam@rocknblocklandscape.com";
+    // The RNB Academy section only goes in once the rep's Academy user exists —
+    // never hand out a login that does not work. While academy.create_user is
+    // still queued or retrying, wait (same WAIT path as the mailbox check).
+    const academy = await academyStatus(repId);
+    if (academy === "pending") throw new Error("WAIT: RNB Academy user not created yet (academy.create_user still queued)");
+    const vars = { ...repVars(rep), support_email: supportEmail };
     const { subject, body } = await renderTemplate("email.welcome", {
-      ...repVars(rep),
-      support_email: supportEmail,
+      ...vars,
+      academy_section: academy === "created" ? renderFileTemplate("welcome_academy_section.html", vars) : "",
     });
     await graph.sendMail({
       fromUpn: sender,
