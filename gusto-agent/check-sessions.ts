@@ -83,7 +83,10 @@ async function postMonitor(text: string): Promise<string> {
   if (url) {
     try {
       const { Client } = createRequire(path.join(PIPELINE, "package.json"))("pg");
-      const c = new Client({ connectionString: url, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 10000 });
+      // On the Mac mini DATABASE_URL points at the local pgbouncer (127.0.0.1:6432), which
+      // speaks no SSL; asking for SSL there fails and the alert silently never posted.
+      const local = /@(127\.0\.0\.1|localhost)[:/]/.test(url);
+      const c = new Client({ connectionString: url, ssl: local ? false : { rejectUnauthorized: false }, connectionTimeoutMillis: 10000 });
       c.on("error", () => {});
       await c.connect();
       try {
