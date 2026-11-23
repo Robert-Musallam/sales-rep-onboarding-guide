@@ -69,22 +69,15 @@ async function updateRep(repId: number, patch: Record<string, unknown>) {
   if (error) throw new Error(`updateRep: ${error.message}`);
 }
 
-/**
- * Has this rep's RNB Academy user been created? Read from the activity log
- * (academy_user_created carries the ids) and the academy.create_user outbox row.
- *   created  — the user exists
- *   pending  — the row is still queued / in flight / retrying: the welcome waits
- *   off      — no row, skipped (token not set, gate) or failed: send without the section
- */
-async function academyStatus(repId: number): Promise<"created" | "pending" | "off"> {
-  const { data: act } = await db().schema(SHARED).from("entity_activity")
-    .select("action").eq("entity_type", "rep").eq("entity_id", String(repId)).eq("action", "academy_user_created").limit(1);
-  if (act?.length) return "created";
-  const { data: row } = await db().schema(ONBOARDING).from("outbox")
-    .select("state").eq("rep_id", repId).eq("action_type", "academy.create_user")
-    .order("id", { ascending: false }).limit(1).maybeSingle();
-  if (!row) return "off";
-  return row.state === "pending" || row.state === "in_flight" ? "pending" : "off";
+export const ACADEMY_EMAIL_SUBJECT = "Welcome to Rock N Block Academy: your training starts here";
+
+/** Queue the separate Academy email (dedupe: once per rep). */
+async function queueAcademyWelcome(repId: number): Promise<void> {
+  const { error } = await db().schema(ONBOARDING).from("outbox").upsert(
+    [{ action_type: "email.academy_welcome", rep_id: repId, payload: {}, dedupe_key: `academy.welcome_email:${repId}` }],
+    { onConflict: "dedupe_key", ignoreDuplicates: true },
+  );
+  if (error) throw new Error(`outbox: ${error.message}`);
 }
 
 /** Trim, drop blanks, and collapse case-insensitive duplicates. */
@@ -597,11 +590,13 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
   },
 
   /**
-   * RNB Academy user (docs/academy-roster-api.md). First action of the
-   * welcome_done bundle, so it lands before email.welcome, which waits for it.
-   * Login = the rep's Microsoft email, password = the same temporary password
-   * as Microsoft (decided 2026-11-20). No ACADEMY_ROSTER_TOKEN = the step is off:
-   * skipped with an alert, and the welcome goes out without the Academy section.
+   * RNB Academy user (docs/academy-roster-api.md), fired by ticking "Welcome
+   * message sent". Login = the rep's Microsoft email, password = the same
+   * temporary password as Microsoft (decided 2026-11-20). On success it queues
+   * the separate Academy email (email.academy_welcome, decided 2026-11-23: the
+   * welcome email itself stays as it was). No ACADEMY_ROSTER_TOKEN = step off:
+   * skipped with an alert and no Academy email. API errors throw, so the
+   * executor retries and then fails the row with an alert.
    */
   "academy.create_user": async (repId) => {
     const rep = await loadRep(repId);
@@ -611,7 +606,7 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
       .select("action").eq("entity_type", "rep").eq("entity_id", String(repId)).eq("action", "academy_user_created").limit(1);
     if (done?.length) return { done: true, note: "Academy user already created" };
     if (!ENV.academyRosterToken()) {
-      await alert("Academy user not created", `${rep.first_name} ${rep.last_name}: ACADEMY_ROSTER_TOKEN is not set in .env.local on the Mac mini. The welcome email goes out without the Academy section.`);
+      await alert("Academy user not created", `${rep.first_name} ${rep.last_name}: ACADEMY_ROSTER_TOKEN is not set in .env.local on the Mac mini. No Academy user and no Academy email; the welcome email is not affected.`);
       return { skipped: true, note: "ACADEMY_ROSTER_TOKEN not set — Academy step off" };
     }
     const verdict = gate("provision");
@@ -629,7 +624,40 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
       academy_roster_id: r.id,
       created: r.created,
     });
-    return { done: true, note: `Academy user ${r.user_id}` };
+    await queueAcademyWelcome(repId);
+    return { done: true, note: `Academy user ${r.user_id} · Academy email queued` };
+  },
+
+  /**
+   * The separate "Welcome to Rock N Block Academy" email (worker/templates/
+   * academy_welcome_email.html), queued only by a successful academy.create_user.
+   * Same recipients and mailbox wait as email.welcome.
+   */
+  "email.academy_welcome": async (repId) => {
+    const rep = await loadRep(repId);
+    if (!rep.rnb_email) throw new Error("rep has no rnb_email yet");
+    const { data: created } = await db().schema(SHARED).from("entity_activity")
+      .select("action").eq("entity_type", "rep").eq("entity_id", String(repId)).eq("action", "academy_user_created").limit(1);
+    if (!created?.length) return { skipped: true, note: "no Academy user for this rep — Academy email not sent" };
+    const sender = (await getSetting<string>("welcome_email_sender")) ?? "";
+    if (!sender) throw new Error("app_settings.welcome_email_sender is empty — set it in Settings (SETUP.md §2)");
+    const verdict = gate("email", rep.rnb_email);
+    if (!verdict.allowed) return { skipped: true, note: `${verdict.reason} — would send the Academy email to ${rep.rnb_email}` };
+    if (rep.m365_user_id) {
+      const readiness = await graph.mailboxReadiness(rep.m365_user_id);
+      if (!readiness.ready) throw new Error(`WAIT: mailbox ${rep.rnb_email} not ready — ${readiness.detail}`);
+    }
+    const manager = await managerEmail(rep);
+    const cc = dedupeEmails([rep.personal_email, ...((await getSetting<string[]>("welcome_email_cc")) ?? []), manager]);
+    await graph.sendMail({
+      fromUpn: sender,
+      to: [rep.rnb_email],
+      cc,
+      subject: ACADEMY_EMAIL_SUBJECT,
+      html: renderFileTemplate("academy_welcome_email.html", repVars(rep)),
+    });
+    await logActivity(repId, "academy_email_sent", `Academy email → ${rep.rnb_email} (cc ${cc.length}: ${cc.join(", ")})`);
+    return { done: true };
   },
 
   /** Gusto checked → create the Microsoft user (replaces Make's addAMember w/ static password). */
@@ -822,15 +850,9 @@ const handlers: Record<string, (repId: number, payload: Record<string, unknown>)
     // settings so the contact can change without editing the template.
     const supportEmail =
       (await getSetting<string>("support_contact_email")) ?? "rmusallam@rocknblocklandscape.com";
-    // The RNB Academy section only goes in once the rep's Academy user exists —
-    // never hand out a login that does not work. While academy.create_user is
-    // still queued or retrying, wait (same WAIT path as the mailbox check).
-    const academy = await academyStatus(repId);
-    if (academy === "pending") throw new Error("WAIT: RNB Academy user not created yet (academy.create_user still queued)");
-    const vars = { ...repVars(rep), support_email: supportEmail };
     const { subject, body } = await renderTemplate("email.welcome", {
-      ...vars,
-      academy_section: academy === "created" ? renderFileTemplate("welcome_academy_section.html", vars) : "",
+      ...repVars(rep),
+      support_email: supportEmail,
     });
     await graph.sendMail({
       fromUpn: sender,
