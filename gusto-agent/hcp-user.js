@@ -48,7 +48,13 @@ async function out(obj, code) {
 }
 function note(s) { notes.push(s); console.error(`[hcp ${((Date.now() - t0) / 1000).toFixed(1)}s] ${s}`); }
 const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-const onLogin = () => /\/log_in|\/login|sign_in/.test(page.url());
+// Only the real sign-in pages. /app/settings/login_authentication (Team & Permissions →
+// Login Authentication, where HCP sometimes lands instead of /employees) contains "login"
+// and was read as signed out: rep 40 stopped with a false hcp_sign_in_needed, 2026-11-23.
+const onLogin = () => {
+  const u = page.url();
+  return /\/log_in\b|\/sign_in\b|\/users\/sign_in/.test(u) || (/\/login\b/.test(u) && !/login_authentication/.test(u));
+};
 async function accountShown() {
   const sw = page.getByTestId('franchise-menu-button-with-company-name');
   await sw.waitFor({ state: 'visible', timeout: 45000 });
@@ -58,7 +64,15 @@ async function openEmployees() {
   await page.goto('https://pro.housecallpro.com/app/settings/employees', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
   if (onLogin()) await out({ outcome: 'session', reason: 'hcp_sign_in_needed' }, 10);
-  await page.getByTestId('tab-Team').waitFor({ state: 'visible', timeout: 45000 });
+  const team = page.getByTestId('tab-Team');
+  await team.waitFor({ state: 'visible', timeout: 45000 });
+  // HCP remembers the last Team & Permissions tab; switch back to Team if it reopened another.
+  if (/login_authentication/.test(page.url())) {
+    note('landed on Login Authentication — switching to the Team tab');
+    await team.click();
+    await page.waitForURL(/\/settings\/employees/, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+  }
 }
 
 async function paymentPrompt() {
