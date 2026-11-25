@@ -1,0 +1,9 @@
+{
+  // The Mac mini's agents and worker (gusto-agent, worker, scripts). They run with tsx on the
+  // Mac, not on Vercel, and need packages the web app does not have (playwright-core), so the
+  // web build (tsconfig.json) leaves them out. Check them with:
+  //   npx tsc --noEmit -p tsconfig.agents.json
+  "extends": "./tsconfig.json",
+  "include": ["gusto-agent/**/*.ts", "worker/**/*.ts", "scripts/**/*.ts", "lib/**/*.ts"],
+  "exclude": ["node_modules", "supabase/functions"]
+}
