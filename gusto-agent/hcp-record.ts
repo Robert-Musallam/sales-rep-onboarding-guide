@@ -9,6 +9,7 @@
 import { readFileSync } from "node:fs";
 import { db, ONBOARDING, getSetting, logActivity } from "../worker/db";
 import { alert } from "../worker/alert";
+import { reportAgentRun } from "../worker/agent-report";
 import * as graph from "../worker/connectors/graph";
 import * as hcp from "../worker/connectors/hcp";
 
@@ -88,6 +89,9 @@ async function main() {
       status = "stopped"; note = "Housecall Pro sign-in needed in the Gusto agent's Chrome — sign in, then re-arm"; break;
     case "stopped":
       status = "stopped"; note = r.reason ?? "stopped"; break;
+    case "not_started":
+      // Preflight: the agents' Chrome window was hidden, so the run never touched HCP. Nothing was saved.
+      status = "needs_review"; note = `not started: ${r.reason ?? "browser_window_hidden"} — nothing was saved in HCP; bring the agents' Chrome window to the front, then re-arm`; break;
     default:
       status = "needs_review"; note = `no parsable result (${r.outcome ?? "empty"}) — check HCP before re-arming`;
   }
@@ -104,6 +108,7 @@ async function main() {
   }
   await logActivity(repId, `hcp_agent_${status}`, `HCP agent (${mode}): ${status} — ${note}`.slice(0, 300));
   if (status !== "created" && status !== "dry_run_ok") await alert(`HCP agent: ${status}`, `${name}: ${note}`);
+  await reportAgentRun({ agent: "hcp", repId, mode, outcome: r.outcome ?? "unparsed", status, inviteSent: null, stopReason: r.reason ?? null, note });
 }
 
 main().catch(async (e) => {

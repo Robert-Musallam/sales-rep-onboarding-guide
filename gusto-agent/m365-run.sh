@@ -34,6 +34,17 @@ else
   trap 'rm -f "$LOCK"' EXIT
 fi
 
+# Preflight: the agents' Chrome must be visible and drawing. A hidden window lets the agent read
+# pages but not click, and it stops half way (rep 41, 2026-11-25). Nothing is sent from here.
+node "$HERE/preflight-visible.js" 2>>"$HERE/logs/preflight.log"
+prc=$?
+if [ $prc -eq 30 ]; then
+  printf '{"outcome":"not_started","stop_reason":"browser_window_hidden","reason":"browser_window_hidden"}\n' > "$OUT"
+  echo "not started: the agents' Chrome window is hidden -> $OUT"
+  record
+  exit 30
+fi
+
 node "$HERE/tidy-tabs.js" 2>>"$HERE/logs/tidy-tabs.log"
 node "$HERE/m365-license.js" "$REP_JSON" $SEND_FLAG > "$OUT" 2>>"$HERE/logs/m365-license.log"
 lrc=$?

@@ -12,6 +12,7 @@ import { db, ONBOARDING, logActivity } from "../worker/db";
 import { alert } from "../worker/alert";
 import { notifyRobert } from "../worker/notify";
 import { completeChecklistItem } from "../worker/checklist";
+import { reportAgentRun } from "../worker/agent-report";
 
 // "Already there" stops that still mean the rep is in Gusto (invited or onboarded).
 const IN_GUSTO_STOP = /^already_in_gusto:(Onboarding|Active)\b/i;
@@ -53,6 +54,19 @@ async function main() {
   let raw: Record<string, unknown> = {};
   try { raw = JSON.parse(readFileSync(outPath, "utf8")); } catch { /* empty / partial */ }
 
+  // Preflight found the agents' Chrome window hidden: the run never touched Gusto, so nothing was
+  // sent. Left in needs_review (never queued again by itself) so a person fixes the window first.
+  if (raw.outcome === "not_started") {
+    const reason = String(raw.stop_reason ?? "not_started");
+    const note = `not started: ${reason} — nothing was sent to Gusto; bring the agents' Chrome window to the front, then re-arm`;
+    await db().schema(ONBOARDING).from("reps")
+      .update({ gusto_agent_status: "needs_review", gusto_agent_note: note, gusto_agent_at: new Date().toISOString() }).eq("id", repId);
+    await db().schema(ONBOARDING).from("gusto_agent_runs").insert({ rep_id: repId, mode, outcome: "not_started", stop_reason: reason, invite_sent: false, result: raw });
+    await logActivity(repId, "gusto_agent_needs_review", `Gusto agent (${mode}): ${note}`.slice(0, 300));
+    await reportAgentRun({ agent: "gusto", repId, mode, outcome: "not_started", status: "needs_review", inviteSent: false, stopReason: reason, note });
+    return;
+  }
+
   // run.sh's own outcomes: launcher deferred or sign-in step
   if (raw.outcome === "deferred") return requeue(repId, `deferred (launcher exit ${raw.launcher_exit})`, 5);
   if (raw.outcome === "session") {
@@ -79,6 +93,7 @@ async function main() {
     await db().schema(ONBOARDING).from("reps").update({ gusto_agent_status: "stopped", gusto_agent_note: `sign-in failed (login exit ${code})` }).eq("id", repId);
     await db().schema(ONBOARDING).from("gusto_agent_runs").insert({ rep_id: repId, mode, outcome: "session", stop_reason: `login_exit_${code}`, result: raw });
     await alert("Gusto agent: sign-in failed", `${who}: sign-in step failed (exit ${code}). Check the Keychain item gusto-agent.`);
+    await reportAgentRun({ agent: "gusto", repId, mode, outcome: "session", status: "stopped", inviteSent: false, stopReason: `login_exit_${code}` });
     return;
   }
 
@@ -147,6 +162,14 @@ async function main() {
   if (status !== "added" && status !== "dry_run_ok") {
     await alert(`Gusto agent: ${status}`, `${who}: ${note}`);
   }
+
+  // The real end of the run, in the worker log and (when a person is needed) in #monitor. The outbox
+  // row stays DONE: it only means "run.sh was started".
+  await reportAgentRun({
+    agent: "gusto", repId, mode, outcome: result?.outcome ?? "unparsed", status,
+    inviteSent: result ? !!result.invite_sent : null, stopReason: result?.stop_reason ?? null, note,
+    benign: status === "stopped" && IN_GUSTO_STOP.test(note),
+  });
 }
 
 main().catch(async (e) => {
