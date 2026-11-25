@@ -8,6 +8,7 @@
 import { readFileSync } from "node:fs";
 import { db, ONBOARDING, logActivity } from "../worker/db";
 import { alert } from "../worker/alert";
+import { reportAgentRun } from "../worker/agent-report";
 
 type R = { outcome?: string; reason?: string | null; available?: string; licenses_after?: string[]; launcher_exit?: number };
 
@@ -56,6 +57,10 @@ async function main() {
     case "stopped":
       status = "stopped"; note = r.reason ?? "stopped";
       break;
+    case "not_started":
+      // Preflight: the agents' Chrome window was hidden, so the run never touched Microsoft 365.
+      status = "needs_review"; note = `not started: ${r.reason ?? "browser_window_hidden"} — nothing was changed in Microsoft 365; bring the agents' Chrome window to the front, then re-arm`;
+      break;
     default:
       status = "needs_review"; note = `no parsable result (${r.outcome ?? "empty"})`;
   }
@@ -64,6 +69,7 @@ async function main() {
   if (status !== "licensed" && status !== "dry_run_ok") {
     await alert(`M365 agent: ${status}`, `${who}: ${note}`);
   }
+  await reportAgentRun({ agent: "m365", repId, mode, outcome: r.outcome ?? "unparsed", status, inviteSent: null, stopReason: r.reason ?? null, note });
   // Seat warning: after a save, flag when Business Basic is running out.
   const m = (r.available ?? "").match(/(\d+)\s+of/);
   if (status === "licensed" && m && Number(m[1]) <= 1) {
