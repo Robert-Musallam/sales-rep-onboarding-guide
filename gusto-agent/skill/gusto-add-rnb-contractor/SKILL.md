@@ -86,7 +86,8 @@ People → **Add** → **Add a person**.
 |---|---|
 | Rock n block arizona | DESIGN CONSULTANT AZ |
 | Rock N Block llc (Las Vegas, Utah) | Sales independant contractor 2025 |
-| Rock N Block CO LLC · Rock n block florida llc · Rock n block San Diego llc | not confirmed yet: keep the ONE document whose name contains "contractor"; if there are none or several → STOP `contractor_agreement_unclear:<names>` and report the list |
+| Rock n block florida llc | Florida sales (Robert, 2026-11-25: for Florida the contractor agreement IS the document named "Florida sales"; check it, uncheck every other team document. If a document with that exact name is not there → STOP `contractor_agreement_unclear:<names>` and report the list) |
+| Rock N Block CO LLC · Rock n block San Diego llc | not confirmed yet: keep the ONE document whose name contains "contractor"; if there are none or several → STOP `contractor_agreement_unclear:<names>` and report the list |
 
 ## Step 7: Verify
 The rep's onboarding checklist must show **Invite <name> to Gusto — Invitation sent**, where <name> is the
