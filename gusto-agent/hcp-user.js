@@ -122,6 +122,13 @@ async function cancelPayment(p) {
       await page.waitForTimeout(5000);
       await page.waitForLoadState('domcontentloaded').catch(() => {});
       await openEmployees();
+      // HCP can take longer than the fixed wait to apply the switch: the header still read
+      // "Rock N Block-Parent" after 5 s for rep 41 (2026-11-26). Poll the header for up to
+      // 30 s, reloading the Team page once halfway, before the check below decides.
+      for (let i = 0; i < 10 && (await accountShown()) !== account; i++) {
+        await page.waitForTimeout(3000);
+        if (i === 4) { note('account switch not applied yet — reloading the Team page'); await openEmployees(); }
+      }
       note(`switched to ${account}`);
     }
     const shown = await accountShown();
